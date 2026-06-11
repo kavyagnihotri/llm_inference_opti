@@ -13,10 +13,57 @@ self-attention between a query block and a group of key-value blocks can be comp
 As we compute blockwise attention and feedforward, each host efficiently coordinates by concurrently sending key-value blocks being used for attention computation to the next host while receiving key-value blocks from the preceding host, effectively overlapping transferring of blocks with blockwise computation. 
 
 
+The text points out a major flaw in the inner loop (key-value interactions).If we look back at the equation, to calculate the final attention for block 1, $Q_1$ doesn't just need $K_1$ and $V_1$. Because attention requires every word to look at every other word, $Q_1$ must be multiplied by all Keys and Values in the entire sequence:$$\text{Output}_1 \approx \text{softmax}\left( Q_1 [K_1^T, K_2^T, K_3^T, \dots] \right) [V_1, V_2, V_3, \dots]$$Because Host 1 only owns $K_1$ and $V_1$, it has to fetch $K_2, V_2$ from Host 2, and $K_3, V_3$ from Host 3 over the network.
 
+Since each host possesses only one key-value block, the naive approach of fetching blocks from other hosts results in two significant issues. Firstly, it introduces a computation delay as the system waits to receive the necessary key-value blocks.Secondly, the accumulation of key-value blocks leads to increased memory usage, which defeats the purpose of reducing memory cost.
+
+the self-attention between a query block and a group of key-value blocks can be computed in any order, as long as the statistics of each block are combined correctly for rescaling.
+
+Concretely, for any host-i, during the computation of attention between its query block and a key-value block, it concurrently sends key-value blocks to the next host-(i + 1) while receiving key-value blocks from the preceding host-(i − 1). If the computation time exceeds the time required for transferring key-value blocks, this results in no additional communication cost. This overlapping mechanism applies to both forward and backward passes of our approach since the same operations and techniques can be used.
+
+utilizing blockwise parallel transformers to substantially reduce memory costs. As we show in the next section, this enables zero-overhead scaling of context size during both training and inference and allows arbitrarily large context size.
+
+Arithmetic Intensity Between Hosts. In order to determine the minimal required block size to overlap transferring with computation, assume that each host has F FLOPS and that the bandwidthbetween hosts is denoted as B. It’s worth noting that our approach involves interactions only with the immediately previous and next hosts in a circular configuration, thus our analysis applies to both GPU all-to-all topology and TPU torus topology. Let’s consider the variables: block size denoted as c and hidden size as d. When computing blockwise self-attention, we require 2dc2 FLOPs for calculating attention scores using queries and keys, and an additional 2dc2 FLOPs for multiplying these attention scores by values. In total, the computation demands amount to 4dc2 FLOPs. We exclude the projection of queries, keys, and values, as well as blockwise feedforward operations, since they only add compute complexity without any communication costs between hosts. This simplification leads to more stringent condition and does not compromise the validity of our approach. On the communication front, both key and value blocks require a total of 2cd bytes. Thus, the combined communication demand is 4cd bytes. To achieve an overlap between communication and computation, the following condition must hold: 4dc2/F ≥ 4cd/B. This implies that the block size, denoted as c, should be greater than or equal to F/B. Effectively, this means that the block size needs to be larger than the ratio of FLOPs over bandwidth.
+
+Memory Requirement. A host needs to store multiple blocks, including one block size to store the current query block, two block sizes for the current key and value blocks, and two block sizes for receiving key and value blocks. Furthermore, storing the output of blockwise attention and feedforward necessitates one block size, as the output retains the shape of the query block. Therefore, a total of six blocks are required, which translates to 6bch bytes of memory. our method exhibits the advantage of linear memory scaling with respect to the block size c, and is independent of the input sequence length s.
+
+Our analysis shows that the model needs to have a sequence length of s = 6c, which is six times the minimal block size. These requirements are easy to meet with parallelism such as data and tensor parallelism and memory efficient blockwise attention and feedforward.
+
+Algorithm 1 Reducing Transformers Memory Cost with Ring Attention.
+Required: Input sequence x. Number of hosts Nh.
+Initialize
+Split input sequence into Nh blocks that each host has one input block.
+Compute query, key, and value for its input block on each host.
+for Each transformer layer do
+for count = 1 to Nh − 1 do
+for For each host concurrently. do
+Compute memory efficient attention incrementally using local query, key, value blocks.
+Send key and value blocks to next host and receive key and value blocks from previous
+host.
+end for
+end for
+for For each host concurrently. do
+Compute memory efficient feedforward using local attention output.
+end for
+end for
+
+We utilize FSDP along with Ring Attention to extend the sequence length to nl m and m sequences. This means that the total batch size in tokens remains the same, but Ring Attention enables a significantly larger context size. 
+
+If a model can be trained with context size s on n GPUs using the blockwise attention and feedforward, with our Ring Attention approach, it becomes possible to train a model with a context size of ns.
+
+Ring Attention trains much longer context sizes for self-attention, resulting in higher self-attention FLOPs compared to baseline models. Since self-attention has a lower MFU (model flops utilization) than feedforward, Ring Attention is expected to have a lower MFU than the baseline models. Our method offers a clear advantage in terms of maintaining MFU while enabling training with significantly longer context lengths. when comparing our approach to prior state-of-the-arts, it is evident that we can train very large context models without compromising MFU or throughput.
+
+Through extensive experiments on language modeling and reinforcement learning, we demonstrate its effectiveness, enabling training sequences that are up to device count times longer than those of prior memory-efficient Transformers, exceeding a context length of 100 million without making approximations to attention.
 
 
 ## Stripped Attention
+special case of causal transformer models, and identify a key workload imbalance due to triangular structure of causal attention computations. We propose a simple extension to Ring Attention, which we call Striped Attention to fix this imbalance. Instead of devices having contiguous subsequences, each device has a subset of tokens distributed uniformly throughout the sequence, which we demonstrate leads to more even workloads.
 
+It is well known that causal self-attention can be computed more cheaply than general bidirectional self-attention; in causal self-attention, each query only interacts with keys which appear earlier than it in the sequence, reducing the total number of operations required by roughly a factor of 2×.
+
+Unlike existing single-device attention kernels, we observe that Ring Attention cannot make effective use of the structure of causal attention to improve its throughput on a per device basis. The reason for this limitation is a workload imbalance: on all but the first iteration of the Ring Attention algorithm, the workload of some devices is entirely necessary (unmasked), while the workload of others is entirely unnecessary (masked) for the final output. The latency of RingAttention is determined by the maximum latency of any participating device per iteration. As a result, regardless of per device optimizations, the latency per iteration would be the same as the time taken to compute a fully unmasked workload. As a result, RingAttention will run as fast as a workload with no attention masking, despite in principle needing to compute only half the operations. To successfully exploit the structure of causal self-attention, we need to change how Ring Attention partitions work among devices. We propose Striped Attention, a variant of Ring Attention which permutes the input sequence in a way which almost entirely eliminates the workload imbalance present in the original Ring Attention algorithm. In particular, we permute the sequence so that every device always operates on a discontiguous subset of tokens distributed approximately uniformly throughout the original sequence. This ensures that approximately half of the query/key interactions on each device will be inhibited by the causal mask. Like Ring Attention, Striped Attention is an exact attention algorithm; we exploit the permutation equivariance of the core attention computation to ensure that our decision to internally permute the input sequence does not affect the final output of the model. Unlike Ring Attention, Striped Attention is able to take advantage of the structure of causal attention to save time on every iteration
+
+In experiments running Striped Attention on A100 GPUs and TPUv4s, we are able to achieve up to 1.45× end-to-end throughput improvements over the original Ring Attention algorithm on causal transformer training at a sequence length of 256k. Furthermore, on 16 TPUv4 chips, we were able to achieve 1.65× speedups
+at sequence lengths of 786k.
 
 
