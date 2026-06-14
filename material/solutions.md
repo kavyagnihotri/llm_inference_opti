@@ -241,4 +241,11 @@ To eliminate the idle waiting time between the different servers, SGLang upgrade
 ## vLLM context parallel deployment docs
 uses ring and stripe attention
 
-## Engineering discussion: vLLM #22693 vs vLLM #34018
+### Engineering discussion: vLLM #22693 vs vLLM #34018
+Bring Ring + Stripe Attention in practise
+Helix (NVIDIA, 2025) replaces the ring with All-to-All communication. Every GPU sends its partial attention output (plus the log-sum-exp normalization factor) to every other GPU simultaneously.
+
+## Tension
+vLLM is betting on CP
+SGLang is betting on PP
+Both acknowledge the future is CP×PP.
