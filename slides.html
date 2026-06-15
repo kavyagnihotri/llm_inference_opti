@@ -6,79 +6,108 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reset.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reveal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/theme/white.css">
-<script>MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]},svg:{fontCache:'global'}};</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>MathJax={tex:{packages:{'[+]':['color']},inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]},svg:{fontCache:'global'}};</script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
 :root{
-  --red:#c62828;
-  --blue:#1565c0;
-  --hl:#1a5bb5;
-  --dim:#8a7a72;
+  --dark:#1a1a2e;
+  --mid:#4a5568;
+  --red:#a51e37;
+  --blue:#1a1a2e;
+  --hl:#1a1a2e;
+  --dim:#7a7a7a;
   --card:#ffffff;
-  --border:#e2d5c8;
-  --bg:#faf7f2;
-  --text:#2c2420;
-  --body:#4a3f38;
-  --math:#f0e8df;
+  --border:#e5e5e5;
+  --bg:#fafafa;
+  --text:#2d3436;
+  --body:#555555;
+  --math:#f8f9fa;
 }
 /* Override reveal white theme background */
 .reveal,.reveal .slide-background{background:var(--bg)!important;}
-.reveal .slides{font-size:36px;}
+.reveal .slides{font-size:28px;}
 
-.reveal{font-family:'Segoe UI',system-ui,sans-serif;}
+.reveal{font-family:'Inter',system-ui,sans-serif;color:#2d3436;}
 .reveal section{
   text-align:left;
-  padding:18px 46px 18px 46px;
+  padding:20px 40px;
   box-sizing:border-box;
-  height:100%;
+  min-height:100%;
+  height:auto;
   overflow:hidden;
+  display:flex;
+  flex-direction:column;
 }
-.reveal h1{font-size:1.75em;font-weight:800;letter-spacing:-0.5px;color:var(--text);margin:0 0 0.2em;}
-.reveal h2{font-size:1.15em;font-weight:700;color:var(--text);margin:0 0 0.4em;border-bottom:2.5px solid var(--red);padding-bottom:6px;}
-.reveal h3{font-size:0.75em;font-weight:700;color:var(--hl);text-transform:uppercase;letter-spacing:0.8px;margin:0 0 5px;}
+.reveal h1,.reveal h2,.reveal h3,.reveal h4{font-family:'Inter',sans-serif;font-weight:700;letter-spacing:-.02em;text-transform:none;}
+.reveal h1{font-size:2.2em;color:var(--text);margin:0 0 0.2em;}
+.reveal h2{font-size:1.5em;color:var(--dark);margin:0 0 0.35em;}
+.reveal h3{font-size:1.1em;color:var(--mid);margin:0 0 6px;}
 .reveal ul{list-style:none;padding-left:0;margin:0;}
-.reveal ul li{padding:2px 0;font-size:0.6em;color:var(--body);}
-.reveal ul li::before{content:"→ ";color:var(--red);}
-.reveal p{margin:0.25em 0;}
+.reveal ul{margin-left:0;padding-left:0;}
+.reveal ul li{margin-bottom:.18em;line-height:1.32;list-style:none;position:relative;padding-left:1em;font-size:0.72em;color:#555;}
+.reveal ul li::before{content:'';position:absolute;left:0;top:.55em;width:4px;height:4px;border-radius:50%;background:#bbb;}
+.reveal ul li li::before{background:#ddd;width:4px;height:4px;border-radius:50%;}
+.reveal p{margin:.5em 0;line-height:1.4;}
 
-/* Section break slides stay dark */
-.sec-break{text-align:center!important;background:linear-gradient(135deg,#1c1730 0%,#2a0d0d 100%)!important;}
-.sec-break .slide-background-content{background:linear-gradient(135deg,#1c1730 0%,#2a0d0d 100%)!important;}
+.reveal .slides section.title-slide{text-align:center !important;}
+.reveal .slides section.section-slide{text-align:center !important;}
+.reveal .slides section.section-slide h2{font-size:2em;color:#fff;text-align:center;border:none;padding:0;margin:0;}
+
+.card-grid{display:grid;gap:16px;margin-top:16px;}
+.card-grid-2{grid-template-columns:1fr 1fr;}
+.card-grid-3{grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.card-grid-4{grid-template-columns:repeat(4,1fr);gap:10px;}
+
+/* Section break slides use the same dark canvas as the AI safety deck */
+.sec-break,.section-slide{text-align:center!important;background:var(--blue)!important;}
+.sec-break .slide-background-content,.section-slide .slide-background-content{background:var(--blue)!important;}
 .sec-break h1{color:#fff!important;font-size:2em;}
-.sec-eyebrow{font-size:0.5em;color:#a78bfa;text-transform:uppercase;letter-spacing:4px;margin-bottom:10px;display:block;}
-.sec-sub{color:#aaa!important;font-size:0.65em;margin-top:10px;}
+.sec-break h2,.section-slide h2{color:#fff!important;font-size:2em;border:none;padding:0;}
+.sec-eyebrow{font-size:0.5em;color:#fff;text-transform:uppercase;letter-spacing:4px;margin-bottom:10px;display:block;opacity:.7;}
+.sec-sub{color:rgba(255,255,255,0.6)!important;font-size:0.65em;margin-top:10px;}
+
+/* Title slide */
+.title-slide{background:var(--bg)!important;}
+.title-slide .subtitle{font-size:1.15em;color:#888;font-weight:300;}
+.title-slide .course-info{margin-top:1.5em;font-size:.8em;color:#888;line-height:1.8;}
+.title-slide .chip{font-size:0.46em;}
 
 /* Cards */
-.card{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:11px 15px;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-.card h3{margin-bottom:5px;}
-.card p,.card li{font-size:0.58em;color:var(--body);line-height:1.5;}
+.card,.card-dark{background:#fff;border-radius:8px;padding:18px;border:1px solid #e5e5e5;box-shadow:none;}
+.card h3,.card h4,.card-dark h3,.card-dark h4{color:var(--text);margin:0 0 8px;}
+.card p,.card li,.card-dark p,.card-dark li{font-size:.7em;color:#555;margin:0;line-height:1.4;}
+.card-grid-4 .card{padding:12px;}
+.card-grid-4 .card h4{font-size:.75em;}
+.card-grid-4 .card p{font-size:.6em;}
 
 /* Grids */
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
-.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:flex-start;max-width:100%;overflow:hidden;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
 
 /* Math box */
-.math-box{background:var(--math);border:1px solid var(--border);border-radius:7px;padding:13px 18px;margin:6px 0;}
+.math-box{background:#fafafa;border:1px solid #e5e5e5;border-radius:8px;padding:12px 16px;margin:8px 0;}
 
 /* Tags */
 .tag{display:inline-block;font-size:0.38em;padding:2px 9px;border-radius:20px;color:#fff;vertical-align:middle;margin-left:7px;text-transform:uppercase;letter-spacing:1px;font-weight:600;}
-.tag.loss{background:var(--blue);}
+.tag.loss{background:var(--dark);}
 .tag.lossy{background:var(--red);}
 
 /* Misc */
 .bignum{font-size:2.6em;font-weight:900;line-height:1;color:var(--red);}
-.cite{position:absolute;bottom:5px;right:36px;font-size:0.35em;color:var(--dim);font-style:italic;}
-.hint{font-size:0.44em;color:var(--dim);font-style:italic;text-align:center;margin-top:4px;}
-.chip{display:inline-block;background:#f0e8df;border:1px solid var(--border);border-radius:20px;padding:4px 13px;font-size:0.5em;color:var(--body);margin:3px;}
+.cite{position:absolute;bottom:5px;right:36px;font-size:0.35em;color:#aaa;font-style:italic;word-wrap:break-word;overflow-wrap:break-word;line-height:1.5;}
+.hint{font-size:0.44em;color:#999;font-style:italic;text-align:center;margin-top:4px;}
+.chip{display:inline-block;background:#f5f5f5;border:1px solid #e5e5e5;border-radius:20px;padding:4px 13px;font-size:0.5em;color:#555;margin:3px;}
 .chip.on{background:var(--red);border-color:var(--red);color:#fff;}
 
 /* Tables */
-table.dt{width:100%;border-collapse:collapse;font-size:0.56em;}
-table.dt th{background:var(--math);color:var(--hl);padding:6px 10px;text-align:left;font-size:0.9em;border-bottom:2px solid var(--border);}
-table.dt td{padding:5px 10px;border-bottom:1px solid var(--border);color:var(--body);}
-table.dt tr:hover td{background:#faf7f2;}
+table.dt{width:100%;border-collapse:separate;border-spacing:0;font-size:.68em;margin:12px 0;border-radius:8px;overflow:hidden;table-layout:fixed;}
+table.dt th{background:var(--dark);color:#fff;padding:10px 14px;font-weight:600;text-align:left;}
+table.dt td{padding:8px 14px;border-bottom:1px solid #eee;background:#fff;color:#555;}
+table.dt tr:last-child td{border-bottom:none;}
+table.dt tr:nth-child(even) td{background:#f8f9fa;}
 
 /* Status colors on light bg */
 .good{color:#15803d;}
@@ -86,10 +115,14 @@ table.dt tr:hover td{background:#faf7f2;}
 .bad{color:#c62828;}
 
 /* Misc */
-.figcap{font-size:0.42em;color:var(--dim);text-align:center;margin-top:5px;font-style:italic;}
+.figcap{font-size:.55em;color:#aaa;text-align:center;margin-top:5px;font-style:italic;}
 input[type=range]{width:100%;accent-color:var(--red);}
-button.btn{background:var(--red);color:#fff;border:none;padding:6px 16px;border-radius:20px;cursor:pointer;font-size:0.55em;font-family:inherit;}
+button.btn{padding:7px 16px;border:none;border-radius:8px;background:var(--red);color:#fff;font-family:'Inter',sans-serif;font-size:.65em;cursor:pointer;margin:4px;}
+button.btn:hover{background:#8f172f;}
 button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var(--body);margin-left:5px;}
+.reveal a{color:#1565c0;text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px;}
+.reveal a:hover{color:var(--dark);text-decoration-color:var(--dark);}
+.card a,.card-dark a{color:#1565c0;text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px;}
 </style>
 </head>
 <body>
@@ -97,10 +130,10 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
 <div class="slides">
 
 <!-- ====== SLIDE 1: TITLE ====== -->
-<section class="sec-break" style="padding:50px 70px!important;display:flex!important;flex-direction:column;justify-content:center;align-items:center;">
-  <span class="sec-eyebrow" style="color:#f8b4b4;">University of Tubingen — LLM Inference Optimization — Summer 2026</span>
-  <h1 style="font-size:1.9em;margin-bottom:0.25em;color:#fff!important;">Long-Context LLM Inference</h1>
-  <p style="color:#bbb;font-size:0.68em;margin-bottom:1.5em;">From Memory Walls to Million-Token Models</p>
+<section class="title-slide" style="padding:60px 60px 46px!important;display:flex!important;flex-direction:column;justify-content:flex-start;align-items:center;gap:6px;">
+  <span class="sec-eyebrow">University of Tubingen — LLM Inference Optimization — Summer 2026</span>
+  <h1 style="font-size:1.72em;margin-bottom:0.12em;color:var(--text);">Long-Context LLM Inference</h1>
+  <p style="color:var(--body);font-size:0.62em;margin-bottom:0.5em;">From Memory Walls to Million-Token Models</p>
   <div>
     <span class="chip on">Ring Attention</span>
     <span class="chip on">Striped Attention</span>
@@ -110,16 +143,12 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   </div>
 </section>
 
-<!-- ====== SLIDE 2: CONTEXT LENGTH GROWTH ====== -->
-<section>
-  <h2>Context Windows Have Grown 2,000x in Seven Years</h2>
-  <canvas id="ctxChart" height="195"></canvas>
-  <p class="hint">Log scale. Red: 1M-token frontier. Amber: 100K+ class. Blue: pre-2023 baselines.</p>
-</section>
-
-<!-- ====== SLIDE 3: WHY LONG CONTEXT ====== -->
+<!-- ====== SLIDE 2: WHY LONG CONTEXT ====== -->
 <section>
   <h2>Why 1M Tokens?</h2>
+  <div style="margin-bottom:13px;padding:11px 17px;background:var(--math);border-left:4px solid var(--hl);border-radius:6px;font-size:0.58em;color:var(--body);">
+    Context windows have grown from roughly <b>512</b> tokens in 2018 to <b>2K</b>, then <b>100K–128K</b>, and now <b>1M</b> tokens at the frontier. The rest of this talk explains why that jump matters and how the memory cost is managed.
+  </div>
   <div class="g3" style="margin-top:12px;">
     <div class="card">
       <h3>Document Analysis</h3>
@@ -139,13 +168,13 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   </div>
 </section>
 
-<!-- ====== SLIDE 4: ATTENTION + KV CACHE ====== -->
+<!-- ====== SLIDE 3: ATTENTION + KV CACHE ====== -->
 <section>
   <h2>KV Cache: What It Is and Why It Costs</h2>
   <div class="g2">
     <div>
       <div class="math-box">
-        \[\text{Attention}(Q,K,V)=\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d}}\right)\!V\]
+        \[\text{Attention}({\color{#1a1a2e}{Q}},{\color{#7c3aed}{K}},{\color{#059669}{V}})=\text{softmax}\!\left(\frac{{\color{#1a1a2e}{Q}}{\color{#7c3aed}{K}}^\top}{\sqrt{d}}\right)\!{\color{#059669}{V}}\]
       </div>
       <ul style="margin-top:10px;line-height:2;">
         <li><span style="color:var(--hl);font-weight:700;">Q</span> — what this token is looking for</li>
@@ -154,6 +183,10 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
       </ul>
       <div style="margin-top:10px;font-size:0.58em;color:var(--body);">
         Example: <i>"a fox jumped over the fence"</i> — "jumped" attends back to "fox" via Q·K matching.
+      </div>
+      <div class="math-box" style="margin-top:9px;font-size:0.82em;">
+        \[\text{KV size} = 2 \times L \times H_{kv} \times d \times \text{bytes} \times n\]
+        <div style="font-size:0.72em;color:var(--dim);margin-top:5px;">L=layers, H=KV heads, d=head dim, n=tokens</div>
       </div>
     </div>
     <div>
@@ -165,54 +198,46 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
         <h3 style="color:var(--red);">The Cost</h3>
         <p>Every token, every layer, every head needs a K and V vector stored in GPU SRAM. At long sequences this becomes tens of gigabytes per request.</p>
       </div>
-      <div class="math-box" style="margin-top:9px;font-size:0.82em;">
-        \[\text{KV size} = 2 \times L \times H_{kv} \times d \times \text{bytes} \times n\]
-        <div style="font-size:0.72em;color:var(--dim);margin-top:5px;">L=layers, H=KV heads, d=head dim, n=tokens</div>
-      </div>
     </div>
   </div>
 </section>
 
-<!-- ====== SLIDE 5: KV CACHE MEMORY INTERACTIVE ====== -->
-<section>
-  <h2>KV Cache Memory: Interactive Calculator</h2>
-  <p style="font-size:0.5em;color:var(--dim);margin-bottom:11px;">Llama-3.1-8B: 32 layers, 8 KV heads, head dim 128, FP32 — 0.25 MB per token</p>
-  <div class="g2">
-    <div>
-      <input type="range" id="seqSlider" min="0" max="6" step="1" value="2">
-      <div style="display:flex;justify-content:space-between;font-size:0.4em;color:var(--dim);margin-top:3px;">
-        <span>1K</span><span>4K</span><span>10K</span><span>32K</span><span>128K</span><span>256K</span><span>1M</span>
-      </div>
-      <div style="text-align:center;margin-top:18px;">
-        <div class="bignum" id="kvNum">2.5</div>
-        <div style="font-size:0.6em;color:var(--dim);" id="kvUnit">GB</div>
-        <div style="font-size:0.5em;color:var(--body);margin-top:5px;" id="kvLabel">10,000 tokens</div>
-      </div>
-      <div style="margin-top:13px;background:var(--math);border-radius:7px;padding:10px 13px;border:1px solid var(--border);">
-        <div style="font-size:0.48em;color:var(--dim);">0.25 MB × <span id="kvSeqVal">10,000</span> tokens =</div>
-        <div style="font-size:0.58em;color:var(--red);font-weight:700;" id="kvCalc">2.5 GB</div>
-      </div>
+<!-- ====== SLIDE 4: KV CACHE MEMORY INTERACTIVE ====== -->
+<section style="align-items:center;">
+  <h2 style="text-align:center;">KV Cache Memory: Interactive Calculator</h2>
+  <p style="font-size:0.5em;color:var(--dim);margin-bottom:11px;text-align:center;">Llama-3.1-8B: 32 layers, 8 KV heads, head dim 128, FP32 — 0.25 MB per token</p>
+  <div style="width:100%;max-width:720px;margin:0 auto;">
+    <input type="range" id="seqSlider" min="0" max="6" step="1" value="2">
+    <div style="display:flex;justify-content:space-between;font-size:0.4em;color:var(--dim);margin-top:3px;">
+      <span>1K</span><span>4K</span><span>10K</span><span>32K</span><span>128K</span><span>256K</span><span>1M</span>
     </div>
-    <div>
-      <table class="dt">
-        <thead><tr><th>Sequence</th><th>KV Cache</th><th>Note</th></tr></thead>
-        <tbody>
-          <tr><td>1,000</td><td class="good">0.25 GB</td><td>Fits easily</td></tr>
-          <tr><td>10,000</td><td class="good">2.5 GB</td><td>Comfortable</td></tr>
-          <tr><td>128,000</td><td class="warn">32 GB</td><td>Full H100</td></tr>
-          <tr><td>1,000,000</td><td class="bad">250 GB</td><td>3x H100s, KV only</td></tr>
-        </tbody>
-      </table>
-      <div class="card" style="margin-top:10px;">
-        <h3>Reference</h3>
-        <p>An H100 SXM has 80 GB HBM total. A single 1M-token request uses more than 3 H100s worth of memory just for the KV cache, before model weights.</p>
-      </div>
+    <div style="text-align:center;margin-top:14px;">
+      <div class="bignum" id="kvNum">2.5</div>
+      <div style="font-size:0.6em;color:var(--dim);" id="kvUnit">GB</div>
+      <div style="font-size:0.5em;color:var(--body);margin-top:4px;" id="kvLabel">10,000 tokens</div>
+    </div>
+    <div style="margin-top:10px;background:var(--math);border-radius:7px;padding:9px 13px;border:1px solid var(--border);text-align:center;">
+      <div style="font-size:0.48em;color:var(--dim);">0.25 MB × <span id="kvSeqVal">10,000</span> tokens =</div>
+      <div style="font-size:0.58em;color:var(--red);font-weight:700;" id="kvCalc">2.5 GB</div>
+    </div>
+    <table class="dt" style="margin-top:13px;">
+      <thead><tr><th>Sequence</th><th>KV Cache</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>1,000</td><td class="good">0.25 GB</td><td>Fits easily</td></tr>
+        <tr><td>10,000</td><td class="good">2.5 GB</td><td>Comfortable</td></tr>
+        <tr><td>128,000</td><td class="warn">32 GB</td><td>Full H100</td></tr>
+        <tr><td>1,000,000</td><td class="bad">250 GB</td><td>3× H100s, KV only</td></tr>
+      </tbody>
+    </table>
+    <div class="card" style="margin-top:10px;">
+      <h3>Reference</h3>
+      <p>An H100 SXM has 80 GB HBM total. A single 1M-token request exceeds 3 H100s of memory just for the KV cache — before model weights.</p>
     </div>
   </div>
   <p class="hint">Drag the slider to explore memory cost at different sequence lengths</p>
 </section>
 
-<!-- ====== SLIDE 6: PREFILL QUADRATIC SCALING ====== -->
+<!-- ====== SLIDE 5: PREFILL QUADRATIC SCALING ====== -->
 <section>
   <h2>Prefill: The Quadratic Wall</h2>
   <div class="g2">
@@ -238,11 +263,11 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   </div>
 </section>
 
-<!-- ====== SLIDE 7: TWO PATHS ====== -->
-<section>
+<!-- ====== SLIDE 6: TWO PATHS ====== -->
+<section style="align-items:center;text-align:center;">
   <h2>Two Paths to Efficient Long-Context Inference</h2>
-  <div class="g2" style="margin-top:13px;align-items:stretch;">
-    <div style="border:2px solid var(--blue);border-radius:11px;padding:17px;background:#f0f5ff;">
+  <div style="display:flex;flex-direction:column;gap:13px;margin-top:13px;width:100%;max-width:860px;">
+    <div style="border:2px solid var(--blue);border-radius:11px;padding:17px;background:#f0f5ff;text-align:left;">
       <h3 style="color:var(--blue);font-size:0.78em;margin-bottom:10px;">Lossless <span style="background:var(--blue);border-radius:20px;padding:2px 9px;font-size:0.72em;color:#fff;margin-left:5px;">Exact</span></h3>
       <p style="font-size:0.58em;color:var(--body);margin-bottom:10px;">Mathematically identical output to full attention. Distribute the work, not reduce it.</p>
       <ul>
@@ -252,7 +277,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
       </ul>
       <div style="margin-top:12px;font-size:0.46em;color:var(--dim);">Memory savings: linear with device count N</div>
     </div>
-    <div style="border:2px solid var(--red);border-radius:11px;padding:17px;background:#fff5f5;">
+    <div style="border:2px solid var(--red);border-radius:11px;padding:17px;background:#fff5f5;text-align:left;">
       <h3 style="color:var(--red);font-size:0.78em;margin-bottom:10px;">Lossy <span style="background:var(--red);border-radius:20px;padding:2px 9px;font-size:0.72em;color:#fff;margin-left:5px;">Approximate</span></h3>
       <p style="font-size:0.58em;color:var(--body);margin-bottom:10px;">Compute a subset of attention. Trade small accuracy loss for large efficiency gain.</p>
       <ul>
@@ -263,7 +288,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
       <div style="margin-top:12px;font-size:0.46em;color:var(--dim);">Speedup: 2x–12x depending on context and method</div>
     </div>
   </div>
-  <div style="text-align:center;margin-top:13px;font-size:0.54em;color:var(--dim);">In practice: lossless methods keep the sequence in memory; lossy methods reduce per-token computation. Production systems combine both.</div>
+  <div style="margin-top:13px;font-size:0.54em;color:var(--dim);">In practice: lossless methods keep the sequence in memory; lossy methods reduce per-token computation. Production systems combine both.</div>
 </section>
 
 <!-- ====== SECTION BREAK: LOSSLESS ====== -->
@@ -273,7 +298,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <p class="sec-sub">Context Parallelism: exact attention distributed across devices</p>
 </section>
 
-<!-- ====== SLIDE 8: CONTEXT PARALLELISM ====== -->
+<!-- ====== SLIDE 7: CONTEXT PARALLELISM ====== -->
 <section>
   <h2>Context Parallelism: Split Sequence, Share KV</h2>
   <div class="g2">
@@ -308,7 +333,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   </div>
 </section>
 
-<!-- ====== SLIDE 9: RING ATTENTION ANIMATION ====== -->
+<!-- ====== SLIDE 8: RING ATTENTION ANIMATION ====== -->
 <section>
   <h2>Ring Attention <span class="tag loss">Lossless</span></h2>
   <div class="g2">
@@ -340,7 +365,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">Liu et al., Ring Attention with Blockwise Transformers for Near-Infinite Context, ICLR 2024</span>
 </section>
 
-<!-- ====== SLIDE 10: ONLINE SOFTMAX MERGE ====== -->
+<!-- ====== SLIDE 9: ONLINE SOFTMAX MERGE ====== -->
 <section>
   <h2>Online Softmax: Why the Math is Exact</h2>
   <div class="g2">
@@ -372,7 +397,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">Liu et al., Ring Attention, ICLR 2024</span>
 </section>
 
-<!-- ====== SLIDE 11: OVERLAP CONDITION + MEMORY ====== -->
+<!-- ====== SLIDE 10: OVERLAP CONDITION + MEMORY ====== -->
 <section>
   <h2>Communication Hidden by Computation</h2>
   <div class="g2">
@@ -411,7 +436,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">Liu et al., Ring Attention, ICLR 2024</span>
 </section>
 
-<!-- ====== SLIDE 12: STRIPED ATTENTION PROBLEM ====== -->
+<!-- ====== SLIDE 11: STRIPED ATTENTION PROBLEM ====== -->
 <section>
   <h2>Striped Attention: Fixing Causal Workload Imbalance <span class="tag loss">Lossless</span></h2>
   <div class="g2">
@@ -434,7 +459,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">Brandon et al., Striped Attention: Faster Ring Attention for Causal Transformers, 2023</span>
 </section>
 
-<!-- ====== SLIDE 13: STRIPED ATTENTION FIX ====== -->
+<!-- ====== SLIDE 12: STRIPED ATTENTION FIX ====== -->
 <section>
   <h2>Striped Attention: Round-Robin Token Assignment</h2>
   <div class="g2">
@@ -491,12 +516,12 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
 
 <!-- ====== SECTION BREAK: LOSSY ====== -->
 <section class="sec-break" style="padding:50px 70px!important;display:flex!important;flex-direction:column;justify-content:center;align-items:center;">
-  <span class="sec-eyebrow" style="color:#fca5a5;">Part II</span>
+  <span class="sec-eyebrow" style="color:var(--red);">Part II</span>
   <h1>Lossy Approaches</h1>
   <p class="sec-sub">Reduce computation itself rather than distributing it</p>
 </section>
 
-<!-- ====== SLIDE 14: NSA OVERVIEW ====== -->
+<!-- ====== SLIDE 13: NSA OVERVIEW ====== -->
 <section>
   <h2>Native Sparse Attention (NSA) <span class="tag lossy">DeepSeek 2025</span></h2>
   <div class="g2">
@@ -519,7 +544,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">Yuan et al., Native Sparse Attention: Hardware-Aligned and Natively Trainable Sparse Attention, DeepSeek 2025</span>
 </section>
 
-<!-- ====== SLIDE 15: NSA THREE BRANCHES ====== -->
+<!-- ====== SLIDE 14: NSA THREE BRANCHES ====== -->
 <section>
   <h2>NSA: Three Branches, One Output</h2>
   <div class="g3">
@@ -546,7 +571,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">Yuan et al., Native Sparse Attention, DeepSeek 2025</span>
 </section>
 
-<!-- ====== SLIDE 16: NSA KERNEL + RESULTS ====== -->
+<!-- ====== SLIDE 15: NSA KERNEL + RESULTS ====== -->
 <section>
   <h2>NSA: Group-Centric Kernel and Results</h2>
   <div class="g2">
@@ -584,7 +609,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">Yuan et al., Native Sparse Attention, DeepSeek 2025</span>
 </section>
 
-<!-- ====== SLIDE 17: SWIFTKV MOTIVATION ====== -->
+<!-- ====== SLIDE 16: SWIFTKV MOTIVATION ====== -->
 <section>
   <h2>SwiftKV: Later Layers Converge <span class="tag lossy">Snowflake 2024</span></h2>
   <div class="g2">
@@ -622,7 +647,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">Qiao et al., SwiftKV: Fast Prefill-Optimized Inference, 2024</span>
 </section>
 
-<!-- ====== SLIDE 18: SWIFTKV RESULTS ====== -->
+<!-- ====== SLIDE 17: SWIFTKV RESULTS ====== -->
 <section>
   <h2>SwiftKV: Recovery via Lightweight Distillation</h2>
   <div class="g2">
@@ -658,7 +683,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">Qiao et al., SwiftKV, 2024 | Arctic Inference plugin for vLLM</span>
 </section>
 
-<!-- ====== SLIDE 19: STREAMING LLM ====== -->
+<!-- ====== SLIDE 18: STREAMING LLM ====== -->
 <section>
   <h2>StreamingLLM: Infinite Context via Attention Sinks <span class="tag lossy">ICLR 2024</span></h2>
   <div class="g2">
@@ -699,7 +724,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <p class="sec-sub">How production systems combine these ideas</p>
 </section>
 
-<!-- ====== SLIDE 20: SGLANG CPP ====== -->
+<!-- ====== SLIDE 19: SGLANG CPP ====== -->
 <section>
   <h2>SGLang: Chunked Pipeline Parallelism</h2>
   <div class="g2">
@@ -730,7 +755,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   </div>
 </section>
 
-<!-- ====== SLIDE 21: VLLM VS SGLANG ====== -->
+<!-- ====== SLIDE 20: VLLM VS SGLANG ====== -->
 <section>
   <h2>vLLM vs SGLang: The Current Tension</h2>
   <div class="g2" style="align-items:stretch;">
@@ -757,7 +782,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   </div>
 </section>
 
-<!-- ====== SLIDE 22: SUMMARY ====== -->
+<!-- ====== SLIDE 21: SUMMARY ====== -->
 <section>
   <h2>The Quality-Efficiency Frontier</h2>
   <div class="g2">
@@ -798,6 +823,28 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   </div>
 </section>
 
+<!-- ====== SLIDE: REFERENCES ====== -->
+<section>
+  <h2>References</h2>
+  <ul style="margin-top:10px;line-height:1.9;">
+    <li>Liu et al., <a href="https://arxiv.org/abs/2310.01889">Ring Attention with Blockwise Transformers for Near-Infinite Context</a>, ICLR 2024 · <a href="https://github.com/haoliuhl/ringattention">code</a></li>
+    <li>Brandon et al., <a href="https://arxiv.org/abs/2311.09431">Striped Attention: Faster Ring Attention for Causal Transformers</a>, 2023</li>
+    <li>Yuan et al., <a href="https://arxiv.org/abs/2502.11089">Native Sparse Attention: Hardware-Aligned and Natively Trainable Sparse Attention</a>, DeepSeek 2025</li>
+    <li>Qiao et al., <a href="https://arxiv.org/abs/2410.03960">SwiftKV: Fast Prefill-Optimized Inference with Knowledge-Preserving Model Transformation</a>, 2024 · <a href="https://github.com/snowflakedb/ArcticInference">Arctic Inference plugin for vLLM</a></li>
+    <li>Xiao et al., <a href="https://arxiv.org/abs/2309.17453">Efficient Streaming Language Models with Attention Sinks</a>, ICLR 2024</li>
+    <li>LMSYS, <a href="https://lmsys.org/blog/2026-01-15-chunked-pipeline/">Chunked Pipeline Parallelism</a>, Blog January 2026</li>
+    <li><a href="https://docs.vllm.ai/en/latest/serving/context_parallel_deployment/">vLLM Context Parallel Deployment Docs</a></li>
+    <li>vLLM engineering discussion: <a href="https://github.com/vllm-project/vllm/issues/22693">#22693</a> vs <a href="https://github.com/vllm-project/vllm/issues/34018">#34018</a> (Ring vs All-to-All CP)</li>
+  </ul>
+</section>
+
+<!-- ====== SLIDE: THANK YOU ====== -->
+<section class="sec-break" style="padding:50px 70px!important;display:flex!important;flex-direction:column;justify-content:center;align-items:center;">
+  <h1 style="color:#fff;font-size:2.6em;margin-bottom:0.15em;">Thank You</h1>
+  <p class="sec-sub" style="font-size:1em;margin-top:6px;">Questions?</p>
+  <div style="margin-top:2em;font-size:0.38em;color:rgba(255,255,255,0.45);">Long-Context LLM Inference · University of Tübingen · Summer 2026</div>
+</section>
+
 </div><!-- .slides -->
 </div><!-- .reveal -->
 
@@ -816,42 +863,6 @@ Reveal.initialize({
   center: false,
   plugins: []
 });
-
-/* -------- Context length chart -------- */
-function initCtxChart() {
-  const el = document.getElementById('ctxChart');
-  if (!el || el._done) return;
-  el._done = true;
-  const labels = ['GPT-1 (2018)','GPT-3 (2020)','GPT-4 (2023)','Claude 2 (2023)','Qwen2.5 (2024)','Gemini 1.5 (2024)','Llama 4 (2025)'];
-  const vals   = [512, 2048, 128000, 100000, 128000, 1000000, 1000000];
-  const colors = vals.map(v => v >= 500000 ? '#c62828' : v >= 100000 ? '#b45309' : '#1565c0');
-  new Chart(el, {
-    type: 'bar',
-    data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 5 }] },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: c => {
-              const v = c.raw;
-              return v >= 1e6 ? `${v/1e6}M tokens` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K tokens` : `${v} tokens`;
-            }
-          }
-        }
-      },
-      scales: {
-        y: {
-          type: 'logarithmic',
-          ticks: { color: '#8a7a72', callback: v => v>=1e6?`${v/1e6}M`:v>=1e3?`${v/1e3}K`:v },
-          grid: { color: '#e2d5c8' }
-        },
-        x: { ticks: { color: '#6b5e56', font: { size: 11 } }, grid: { display: false } }
-      }
-    }
-  });
-}
 
 /* -------- FLOP scaling chart -------- */
 function initFlopChart() {
@@ -1002,13 +1013,11 @@ function ringReset() {
 
 Reveal.on('slidechanged', e => {
   const s = e.currentSlide;
-  if (s.querySelector('#ctxChart'))  initCtxChart();
   if (s.querySelector('#flopChart')) initFlopChart();
   if (s.querySelector('#ringViz'))   drawRing();
 });
 Reveal.on('ready', e => {
   const s = e.currentSlide;
-  if (s.querySelector('#ctxChart'))  initCtxChart();
   if (s.querySelector('#flopChart')) initFlopChart();
   if (s.querySelector('#ringViz'))   drawRing();
 });
