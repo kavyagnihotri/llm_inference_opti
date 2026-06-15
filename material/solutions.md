@@ -136,49 +136,97 @@ Striped Attention addresses a specific inefficiency when Ring Attention is used 
 Sparse attention offers a promising direction for improving efficiency while maintaining model capabilities.
 
 
-## Deepseek's Native Sparse Attention
-We present NSA, a Natively trainable Sparse Attention mechanism that integrates algorithmic innovations with hardware-aligned optimizations to achieve efficient long-context modeling. NSA employs a dynamic hierarchical sparse strategy, combining coarse-grained token compression with fine-grained token selection to preserve both global context awareness and local precision. Our approach advances sparse attention design with two key innovations: (1) We achieve substantial speedups through arithmetic intensity-balanced algorithm design, with implementation optimization~s for modern hardware. (2) We enable end-to-end training, reducing pretraining computation without sacrificing model performance. Experiments show the model pretrained with NSA maintains or exceeds Full Attention models across general benchmarks, long-context tasks, and instruction-based reasoning. Meanwhile, NSA achieves substantial speedups over Full Attention on 64k-length sequences across decoding, forward propagation, and backward propagation, validating its efficiency throughout the model lifecycle.
+## DeepSeek's Native Sparse Attention
 
-To achieve more effective and efficient sparse attention, we present NSA, a Natively trainable Sparse Attention architecture that integrates hierarchical token modeling. NSA reduces per-query computation by organizing keys and values into temporal blocks and processing them through three attention paths: compressed coarse-grained tokens, selectively retained fine-grained tokens, and sliding windows for local contextual information. Then we implement specialized kernels to maximize its practical efficiency. NSA introduces two core innovations corresponding to the key requirements above: (1) Hardware-aligned system: Optimize blockwise sparse attention for Tensor Core utilization and memory access, ensuring balanced arithmetic intensity. (2) Training-aware design: Enable stable end-to-end training through efficient algorithms and backward operators. This optimization enables NSA to support both efficient deployment and end-to-end training.
+Paper: [NSA: Natively Trainable Sparse Attention](https://arxiv.org/html/2502.11089v2)
 
-Modern sparse attention methods have made significant strides in reducing the theoretical computational complexity of transformer models. However, most approaches predominantly apply sparsity during inference while retaining a pretrained Full Attention backbone, potentially introducing architectural bias that limits their ability to fully exploit sparse attention’s advantages. many existing sparse attention methods focus on KV-cache reduction or theoretical computation reduction, but struggle to achieve significant latency reduction in advanced frameworks or backends. Non-Trainable Components and Inefficient Back-propagation
+### The Problem: Why Full Attention Breaks Down
 
-Arithmetic Intensity—the ratio of mathematical operations to memory accesses—determines whether a task is compute-bound (limited by GPU processing speed) or memory-bound (limited by data transfer speeds). If an algorithm's intensity falls below a GPU's specific hardware threshold, it gets bottlenecked by memory bandwidth. In causal self-attention, the training and prefilling phases process large batches of data simultaneously, resulting in high arithmetic intensity that maxes out the GPU's compute capabilities. Conversely, auto-regressive decoding generates only one token at a time but must continuously reload the entire key-value (KV) cache; this drastically lowers the arithmetic intensity, making the generation phase fundamentally memory-bound.
+Standard transformer attention forces every token to attend to every other token. At a sequence length of 64k tokens, this becomes brutally expensive — both in raw computation and in memory bandwidth. The natural response is *sparse attention*: skip the tokens that don't matter. But previous sparse attention methods hit two walls:
 
-<figure 2 from paper, fig2_deepseek_nsa.png> Figure 2 | Overview of NSA’s architecture. Left: The framework processes input sequences through three parallel attention branches: For a given query, preceding keys and values are processed into compressed attention for coarse-grained patterns, selected attention for important token blocks, and sliding attention for local context. Right: Visualization of different attention patterns produced by each branch. Green areas indicate regions where attention scores need to be computed, while white areas represent regions that can be skipped.
+1. They aren't truly native. Most approaches pretrain a Full Attention model and bolt on sparsity at inference time. This means the model never learns *how* to be sparse — it carries an architectural bias from its dense training, limiting how much sparsity can actually help.
 
-Algorithm Design
-Here is a summary of the algorithm design, followed by an explanation of why the authors architected it this way.
+2. They don't actually speed things up on real hardware. Many methods achieve theoretical FLOP reductions or shrink the KV-cache on paper, but fail to translate those savings into actual latency improvements on GPUs. The reason comes down to a fundamental hardware concept: *arithmetic intensity*.
 
-1. Token Compression for Broad Context
-The authors introduce three distinct strategies to efficiently manage how the model pays attention to keys and values: Token Compression, Token Selection, and a Sliding Window. First, Token Compression reduces the overall computational load by aggregating sequential blocks of tokens into single, compressed representations using a learnable neural network (MLP). By overlapping these blocks slightly (using a stride smaller than the block length), the model captures broad, high-level semantic information across the entire sequence without suffering from severe information fragmentation.
+### The Hardware Bottleneck: Arithmetic Intensity
 
-2. Blockwise Token Selection for Fine Details
-Because compression inevitably loses fine-grained, specific details, the model pairs it with a Token Selection mechanism to preserve crucial exact tokens. However, instead of picking individual, scattered tokens from the sequence, the algorithm selects entire continuous *blocks* of tokens. This blockwise approach leverages the natural tendency of attention scores to cluster (neighboring words usually share similar importance) and avoids the scattered memory access that typically slows down hardware.
+Arithmetic intensity is the ratio of math operations to memory accesses. It determines whether a workload is *compute-bound* (the GPU's processors are the bottleneck) or *memory-bound* (waiting on data transfer is the bottleneck). Modern GPUs have a specific crossover threshold — if your algorithm falls below it, no amount of FLOP reduction will help, because the GPU spends its time waiting on memory, not doing math.
 
-3. Efficient Importance Scoring
-To figure out which blocks to select without adding massive computational overhead, the algorithm cleverly reuses data. It takes the intermediate attention scores generated during the *compression* step and maps them to evaluate the importance of the uncompressed selection blocks. For models that share key-value caches across multiple attention heads (like GQA or MQA), these scores are aggregated to ensure the entire group selects the exact same blocks. Ultimately, the algorithm simply retains the top-$n$ highest-scoring blocks for detailed processing.
+This is exactly what happens during autoregressive decoding: the model generates one token at a time but must reload the entire KV-cache for each step, tanking arithmetic intensity and making decoding fundamentally memory-bound. Training and prefilling, by contrast, process large batches simultaneously, keeping intensity high and GPUs compute-saturated.
 
-4. Sliding Window for Local Stability
-Finally, a dedicated Sliding Window mechanism is introduced to exclusively process the most recent, local tokens. Because AI models tend to adapt to immediate local context very quickly, combining local and long-range data into a single attention calculation often results in "shortcut learning," where the model simply ignores the complex compression and selection features. By isolating local tokens into their own independent branch and later merging the results via a gating mechanism, the model stably learns both short-term and long-term patterns without interference.
+Any sparse attention method that scatters its memory access patterns — fetching individual tokens from random positions — destroys arithmetic intensity even further, making the theoretical savings illusory. This is the core constraint NSA is designed around.
 
-The authors designed Native Sparse Attention (NSA) this way to solve the critical tension between theoretical memory efficiency, actual GPU hardware limitations, and stable model training.
+### NSA's Solution: Hierarchical Sparse Attention
 
-If they only compressed tokens, the AI would lose the precise details necessary for high accuracy. If they tried to solve that by plucking out exact, individual tokens, GPU memory fetching would slow to a crawl, ruining the speed benefits of FlashAttention (which requires continuous block reads). By forcing the selection process to be *blockwise*, they maintain hardware speed. Furthermore, by using the cheap compression step to generate the "importance scores" for the selection step, they avoid paying the high computational tax of evaluating the whole sequence twice. Finally, isolating the local tokens into a sliding window ensures that the easily learned local patterns don't drown out the gradient signals needed to train the more complex, long-range compression and selection networks.
+NSA tackles this by splitting attention into three parallel branches, each handling a different spatial scale of context. For a given query, the preceding keys and values flow through all three paths simultaneously, and their outputs are merged via a learned gating mechanism.
 
+<figure 2 from paper, fig2_deepseek_nsa.png> Figure 2 | Overview of NSA's architecture. Left: The framework processes input sequences through three parallel attention branches: For a given query, preceding keys and values are processed into compressed attention for coarse-grained patterns, selected attention for important token blocks, and sliding attention for local context. Right: Visualization of different attention patterns produced by each branch. Green areas indicate regions where attention scores need to be computed, while white areas represent regions that can be skipped.
 
-The Kernel Design
-To achieve FlashAttention-level speeds during training and prefilling, the authors built custom, hardware-aligned sparse attention kernels using Triton, specifically optimized for architectures with shared key-value (KV) caches like Grouped Query Attention (GQA). Standard FlashAttention kernels load continuous blocks of *queries* into the GPU's ultra-fast SRAM, but doing this for sparse attention would force the GPU to fetch scattered, disjoint KV blocks for each query. To fix this, the new kernel flips the data-loading strategy: it uses a "Group-Centric" approach. For any given position in the sequence, the kernel loads all the query heads within a GQA group simultaneously, sequentially fetches the continuous KV blocks that those specific heads share, and offloads the query loops to the GPU's grid scheduler to balance the computational workload.
+#### Branch 1: Token Compression — Capturing Broad Context
 
-The Rationale
-This custom architecture was designed specifically to maximize "arithmetic intensity" (the ratio of math operations to memory fetches) and prevent the GPU from becoming memory-bound. If the authors had stuck to standard FlashAttention, the GPU would waste massive amounts of time fetching fragmented KV data because different queries within a time-block might need completely different selected tokens. By grouping the queries by their GQA heads instead of their timestamp, the kernel ensures that all currently loaded queries require the exact same KV blocks. This entirely eliminates redundant data transfers from the GPU's slow global memory to its fast SRAM, keeping the compute cores constantly fed with data rather than sitting idle waiting for scattered memory reads.
+The first branch compresses sequential blocks of tokens into single, condensed representations using a small learnable MLP. These blocks overlap slightly (the stride is smaller than the block length) to prevent information from falling through the cracks at block boundaries. The result is a dramatically shortened sequence of "summary tokens" that preserves high-level semantic structure across the entire context.
 
-The Integration
-This kernel design is the final puzzle piece that makes the previously discussed algorithm physically viable on hardware. While the compression and sliding window branches use continuous data that already works fine with standard FlashAttention, the dynamic "Token Selection" branch threatened to ruin hardware efficiency. However, because the algorithm was specifically designed to select *continuous blocks* rather than individual tokens, and because it aggregates importance scores so that all heads in a GQA group *agree* on the same selected blocks, this custom kernel can fetch those exact blocks in large, contiguous chunks. The algorithm guarantees the data is grouped perfectly, and this kernel exploits that grouping to process sparse attention without sacrificing hardware speed.
+This gives the model a coarse, panoramic view — it knows roughly what the whole document is about — but compression inevitably destroys fine-grained detail. A compressed block can tell you "this paragraph discusses pricing," but it can't tell you the exact number mentioned.
 
-In summary, Native Sparse Attention (NSA) delivers a massive upgrade in both model performance and hardware efficiency. By intelligently filtering out irrelevant noise, NSA outperforms Full Attention on general reasoning tasks and achieves perfect retrieval accuracy in massive 64k-token documents. Furthermore, because its sparse patterns are learned natively during pretraining, it natively excels at complex chain-of-thought mathematical reasoning without losing context over long sequences. Beyond raw accuracy, NSA's hardware-aligned, blockwise design yields extraordinary computational speedups: it achieves up to 9x faster training and 11.6x faster decoding at 64k contexts by drastically slashing the amount of memory the GPU is forced to fetch and load.
+#### Branch 2: Blockwise Token Selection — Preserving Critical Details
 
+To recover the fine-grained information that compression discards, the second branch selects a subset of *uncompressed* token blocks to attend to at full resolution. The key design decision here is that selection operates on *contiguous blocks*, not individual scattered tokens. This is driven entirely by hardware reality: GPUs load memory in aligned, continuous chunks. Selecting individual tokens from random positions would force the GPU into scattered reads, obliterating the memory access patterns that make FlashAttention fast.
 
+How importance is scored efficiently. Rather than running a separate, expensive evaluation pass over the full sequence, NSA reuses the intermediate attention scores already computed during the compression step. These scores are mapped onto the finer-grained selection blocks to estimate their importance. For architectures with shared KV-caches (GQA/MQA), the scores are aggregated across all heads in a group so that every head selects the *same* blocks — a constraint that becomes critical for the kernel design discussed below. The algorithm simply retains the top-*n* highest-scoring blocks.
+
+This is an elegant piece of engineering: the compression branch does double duty, both summarizing context *and* generating the importance signal that drives selection, at near-zero additional cost.
+
+#### Branch 3: Sliding Window — Stabilizing Local Context
+
+The third branch is a conventional sliding window that attends only to the most recent tokens. This might seem redundant — why not just let the selection branch pick nearby tokens? — but the separation is deliberate and solves a subtle training problem.
+
+Language models adapt to local context very quickly. If local and long-range information flow through the same attention path, the model learns a "shortcut": it leans heavily on the easy local signal and starves the compression and selection branches of gradient. The long-range mechanisms never learn properly because the local signal dominates during training. By isolating local attention into its own branch with an independent gating weight, NSA ensures that the gradients for the compression and selection networks aren't drowned out by the trivially learnable local patterns. All three branches can develop fully.
+
+### Why This Architecture — The Design Logic
+
+Each design choice in NSA exists to resolve a specific tension:
+
+| Tension | Resolution |
+|---|---|
+| Compression loses detail | Pair it with a selection branch that preserves exact tokens |
+| Individual token selection destroys memory access patterns | Force selection to be blockwise, maintaining contiguous reads |
+| Scoring selected blocks is expensive | Reuse the compression branch's intermediate attention scores |
+| Local context drowns out long-range learning | Isolate local attention in a separate sliding window branch |
+| Different heads selecting different blocks ruins shared KV-cache efficiency | Aggregate scores so all heads in a GQA group agree on the same blocks |
+
+Every decision funnels toward one goal: make sparse attention that is simultaneously learnable end-to-end *and* hardware-efficient in practice.
+
+### The Kernel Design: Making It Fast on Real Hardware
+
+The algorithm guarantees clean data access patterns; the custom Triton kernel exploits them.
+
+#### The Problem with Standard FlashAttention
+
+Standard FlashAttention kernels work by loading contiguous blocks of *queries* into the GPU's fast on-chip SRAM, then streaming KV blocks through for each query block. This works beautifully for dense attention because every query needs the same complete set of KVs. But for sparse attention with dynamic selection, different queries within the same time-block may need *different* selected KV blocks. The kernel would be forced to fetch scattered, disjoint KV fragments — exactly the memory access pattern that kills arithmetic intensity.
+
+#### The Fix: Group-Centric Loading
+
+NSA's kernel flips the loading strategy. Instead of grouping by timestamp (all queries at similar positions), it groups by *GQA head group* (all query heads that share a KV-cache). For any given position, the kernel:
+
+1. Loads all the query heads within a GQA group simultaneously.
+2. Sequentially fetches the contiguous KV blocks that those specific heads share (guaranteed to be identical, because the algorithm aggregated their selection scores).
+3. Offloads the outer query-position loop to the GPU's grid scheduler to balance the workload across streaming multiprocessors.
+
+Because every loaded query needs the *exact same* KV blocks, there are zero redundant memory transfers from global memory to SRAM. The compute cores stay constantly fed with data instead of stalling on scattered reads.
+
+#### How Algorithm and Kernel Lock Together
+
+This is where the full design becomes clear. The algorithm's two constraints — blockwise selection and per-group score aggregation — aren't just algorithmic niceties. They are *hardware prerequisites*. Blockwise selection guarantees that KV data can be fetched in large, aligned, contiguous chunks. Per-group aggregation guarantees that all heads in a GQA group request identical chunks, eliminating divergent memory access within a kernel tile. The compression and sliding window branches use naturally contiguous data and work fine with standard FlashAttention. The selection branch — the one that *could* have ruined everything — is tamed by these two constraints, letting the custom kernel process it at near-FlashAttention speeds.
+
+### Results
+
+NSA delivers on both fronts — accuracy and speed:
+
+- Accuracy. Models pretrained with NSA match or exceed Full Attention baselines across general benchmarks, long-context tasks (including perfect retrieval accuracy at 64k tokens), and instruction-based chain-of-thought mathematical reasoning. Because sparsity is learned natively during pretraining, the model doesn't suffer the performance degradation typical of post-hoc sparse methods.
+
+- Speed. On 64k-length sequences, NSA achieves up to 9× faster training forward/backward passes and 11.6× faster decoding compared to Full Attention. These are real wall-clock improvements, not theoretical FLOP counts, because the kernel design ensures the GPU's memory subsystem is never the bottleneck.
+
+The core contribution is the tight co-design: an algorithm that produces hardware-friendly sparse patterns, paired with a kernel that exploits those patterns to their fullest. Neither half works without the other.
 
 ## SwiftKV
 We present SwiftKV, a novel model transformation and distillation procedure targeted at reducing the prefill compute (in FLOPs) of prompt tokens while preserving high generation quality. First, SwiftKV prefills later layers’ KV cache using an earlier layer’s output, allowing prompt tokens to skip those later layers. Second, SwiftKV employs a lightweight knowledge-preserving distillation procedure that can adapt existing LLMs with minimal accuracy impact. Third, SwiftKV can naturally incorporate KV cache compression to improve inference performance in low-memory scenarios. Our comprehensive experiments show that SwiftKV can effectively reduce prefill computation by 25–50% across several LLM families while incurring minimum quality degradation. In the end-to-end inference serving, SwiftKV realizes up to 2× higher aggregate throughput and 60% lower time per output token. It can achieve a staggering 560 TFlops/GPU of normalized inference throughput, which translates to 16K tokens/s for Llama-3.1-70B.
