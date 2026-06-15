@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Long-Context LLM Inference</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/theme/white.css">
+<script>MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]},svg:{fontCache:'global'}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --red:#c62828;
+  --blue:#1565c0;
+  --hl:#1a5bb5;
+  --dim:#8a7a72;
+  --card:#ffffff;
+  --border:#e2d5c8;
+  --bg:#faf7f2;
+  --text:#2c2420;
+  --body:#4a3f38;
+  --math:#f0e8df;
+}
+/* Override reveal white theme background */
+.reveal,.reveal .slide-background{background:var(--bg)!important;}
+.reveal .slides{font-size:36px;}
+
+.reveal{font-family:'Segoe UI',system-ui,sans-serif;}
+.reveal section{
+  text-align:left;
+  padding:18px 46px 18px 46px;
+  box-sizing:border-box;
+  height:100%;
+  overflow:hidden;
+}
+.reveal h1{font-size:1.75em;font-weight:800;letter-spacing:-0.5px;color:var(--text);margin:0 0 0.2em;}
+.reveal h2{font-size:1.15em;font-weight:700;color:var(--text);margin:0 0 0.4em;border-bottom:2.5px solid var(--red);padding-bottom:6px;}
+.reveal h3{font-size:0.75em;font-weight:700;color:var(--hl);text-transform:uppercase;letter-spacing:0.8px;margin:0 0 5px;}
+.reveal ul{list-style:none;padding-left:0;margin:0;}
+.reveal ul li{padding:2px 0;font-size:0.6em;color:var(--body);}
+.reveal ul li::before{content:"→ ";color:var(--red);}
+.reveal p{margin:0.25em 0;}
+
+/* Section break slides stay dark */
+.sec-break{text-align:center!important;background:linear-gradient(135deg,#1c1730 0%,#2a0d0d 100%)!important;}
+.sec-break .slide-background-content{background:linear-gradient(135deg,#1c1730 0%,#2a0d0d 100%)!important;}
+.sec-break h1{color:#fff!important;font-size:2em;}
+.sec-eyebrow{font-size:0.5em;color:#a78bfa;text-transform:uppercase;letter-spacing:4px;margin-bottom:10px;display:block;}
+.sec-sub{color:#aaa!important;font-size:0.65em;margin-top:10px;}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:11px 15px;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.card h3{margin-bottom:5px;}
+.card p,.card li{font-size:0.58em;color:var(--body);line-height:1.5;}
+
+/* Grids */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px;}
+
+/* Math box */
+.math-box{background:var(--math);border:1px solid var(--border);border-radius:7px;padding:13px 18px;margin:6px 0;}
+
+/* Tags */
+.tag{display:inline-block;font-size:0.38em;padding:2px 9px;border-radius:20px;color:#fff;vertical-align:middle;margin-left:7px;text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+.tag.loss{background:var(--blue);}
+.tag.lossy{background:var(--red);}
+
+/* Misc */
+.bignum{font-size:2.6em;font-weight:900;line-height:1;color:var(--red);}
+.cite{position:absolute;bottom:5px;right:36px;font-size:0.35em;color:var(--dim);font-style:italic;}
+.hint{font-size:0.44em;color:var(--dim);font-style:italic;text-align:center;margin-top:4px;}
+.chip{display:inline-block;background:#f0e8df;border:1px solid var(--border);border-radius:20px;padding:4px 13px;font-size:0.5em;color:var(--body);margin:3px;}
+.chip.on{background:var(--red);border-color:var(--red);color:#fff;}
+
+/* Tables */
+table.dt{width:100%;border-collapse:collapse;font-size:0.56em;}
+table.dt th{background:var(--math);color:var(--hl);padding:6px 10px;text-align:left;font-size:0.9em;border-bottom:2px solid var(--border);}
+table.dt td{padding:5px 10px;border-bottom:1px solid var(--border);color:var(--body);}
+table.dt tr:hover td{background:#faf7f2;}
+
+/* Status colors on light bg */
+.good{color:#15803d;}
+.warn{color:#b45309;}
+.bad{color:#c62828;}
+
+/* Misc */
+.figcap{font-size:0.42em;color:var(--dim);text-align:center;margin-top:5px;font-style:italic;}
+input[type=range]{width:100%;accent-color:var(--red);}
+button.btn{background:var(--red);color:#fff;border:none;padding:6px 16px;border-radius:20px;cursor:pointer;font-size:0.55em;font-family:inherit;}
+button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var(--body);margin-left:5px;}
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ====== SLIDE 1: TITLE ====== -->
+<section class="sec-break" style="padding:50px 70px!important;display:flex!important;flex-direction:column;justify-content:center;align-items:center;">
+  <span class="sec-eyebrow" style="color:#f8b4b4;">University of Tubingen — LLM Inference Optimization — Summer 2026</span>
+  <h1 style="font-size:1.9em;margin-bottom:0.25em;color:#fff!important;">Long-Context LLM Inference</h1>
+  <p style="color:#bbb;font-size:0.68em;margin-bottom:1.5em;">From Memory Walls to Million-Token Models</p>
+  <div>
+    <span class="chip on">Ring Attention</span>
+    <span class="chip on">Striped Attention</span>
+    <span class="chip on">Native Sparse Attention</span>
+    <span class="chip on">SwiftKV</span>
+    <span class="chip on">StreamingLLM</span>
+  </div>
+</section>
+
+<!-- ====== SLIDE 2: CONTEXT LENGTH GROWTH ====== -->
+<section>
+  <h2>Context Windows Have Grown 2,000x in Seven Years</h2>
+  <canvas id="ctxChart" height="195"></canvas>
+  <p class="hint">Log scale. Red: 1M-token frontier. Amber: 100K+ class. Blue: pre-2023 baselines.</p>
+</section>
+
+<!-- ====== SLIDE 3: WHY LONG CONTEXT ====== -->
+<section>
+  <h2>Why 1M Tokens?</h2>
+  <div class="g3" style="margin-top:12px;">
+    <div class="card">
+      <h3>Document Analysis</h3>
+      <p>Legal contracts, research papers, full codebases in a single pass. Chunking creates seam artifacts; full context does not.</p>
+    </div>
+    <div class="card">
+      <h3>Agentic Loops</h3>
+      <p>Multi-step agent traces accumulate tool outputs, memory scratchpads, and prior turns. Context grows with task complexity.</p>
+    </div>
+    <div class="card">
+      <h3>Multimodal</h3>
+      <p>A single high-res video frame or interleaved image sequence easily reaches tens of thousands of tokens.</p>
+    </div>
+  </div>
+  <div style="margin-top:13px;padding:11px 17px;background:var(--math);border-left:4px solid var(--hl);border-radius:6px;font-size:0.58em;color:var(--body);">
+    <b>Scale:</b> 128K tokens = a standard full-length novel (96K English words). 1M tokens = roughly 750 pages. These are not edge cases for modern RAG, code agents, or multimodal pipelines.
+  </div>
+</section>
+
+<!-- ====== SLIDE 4: ATTENTION + KV CACHE ====== -->
+<section>
+  <h2>KV Cache: What It Is and Why It Costs</h2>
+  <div class="g2">
+    <div>
+      <div class="math-box">
+        \[\text{Attention}(Q,K,V)=\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d}}\right)\!V\]
+      </div>
+      <ul style="margin-top:10px;line-height:2;">
+        <li><span style="color:var(--hl);font-weight:700;">Q</span> — what this token is looking for</li>
+        <li><span style="color:#7c3aed;font-weight:700;">K</span> — what every other token contains</li>
+        <li><span style="color:#059669;font-weight:700;">V</span> — the actual content of those tokens</li>
+      </ul>
+      <div style="margin-top:10px;font-size:0.58em;color:var(--body);">
+        Example: <i>"a fox jumped over the fence"</i> — "jumped" attends back to "fox" via Q·K matching.
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>The Cache</h3>
+        <p>Autoregressive decoding reuses K and V from all prior tokens. Without caching: O(n²) per step. With caching: O(n) per step. New tokens only compute one new K, V pair.</p>
+      </div>
+      <div class="card" style="margin-top:10px;border-color:var(--red);">
+        <h3 style="color:var(--red);">The Cost</h3>
+        <p>Every token, every layer, every head needs a K and V vector stored in GPU SRAM. At long sequences this becomes tens of gigabytes per request.</p>
+      </div>
+      <div class="math-box" style="margin-top:9px;font-size:0.82em;">
+        \[\text{KV size} = 2 \times L \times H_{kv} \times d \times \text{bytes} \times n\]
+        <div style="font-size:0.72em;color:var(--dim);margin-top:5px;">L=layers, H=KV heads, d=head dim, n=tokens</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 5: KV CACHE MEMORY INTERACTIVE ====== -->
+<section>
+  <h2>KV Cache Memory: Interactive Calculator</h2>
+  <p style="font-size:0.5em;color:var(--dim);margin-bottom:11px;">Llama-3.1-8B: 32 layers, 8 KV heads, head dim 128, FP32 — 0.25 MB per token</p>
+  <div class="g2">
+    <div>
+      <input type="range" id="seqSlider" min="0" max="6" step="1" value="2">
+      <div style="display:flex;justify-content:space-between;font-size:0.4em;color:var(--dim);margin-top:3px;">
+        <span>1K</span><span>4K</span><span>10K</span><span>32K</span><span>128K</span><span>256K</span><span>1M</span>
+      </div>
+      <div style="text-align:center;margin-top:18px;">
+        <div class="bignum" id="kvNum">2.5</div>
+        <div style="font-size:0.6em;color:var(--dim);" id="kvUnit">GB</div>
+        <div style="font-size:0.5em;color:var(--body);margin-top:5px;" id="kvLabel">10,000 tokens</div>
+      </div>
+      <div style="margin-top:13px;background:var(--math);border-radius:7px;padding:10px 13px;border:1px solid var(--border);">
+        <div style="font-size:0.48em;color:var(--dim);">0.25 MB × <span id="kvSeqVal">10,000</span> tokens =</div>
+        <div style="font-size:0.58em;color:var(--red);font-weight:700;" id="kvCalc">2.5 GB</div>
+      </div>
+    </div>
+    <div>
+      <table class="dt">
+        <thead><tr><th>Sequence</th><th>KV Cache</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>1,000</td><td class="good">0.25 GB</td><td>Fits easily</td></tr>
+          <tr><td>10,000</td><td class="good">2.5 GB</td><td>Comfortable</td></tr>
+          <tr><td>128,000</td><td class="warn">32 GB</td><td>Full H100</td></tr>
+          <tr><td>1,000,000</td><td class="bad">250 GB</td><td>3x H100s, KV only</td></tr>
+        </tbody>
+      </table>
+      <div class="card" style="margin-top:10px;">
+        <h3>Reference</h3>
+        <p>An H100 SXM has 80 GB HBM total. A single 1M-token request uses more than 3 H100s worth of memory just for the KV cache, before model weights.</p>
+      </div>
+    </div>
+  </div>
+  <p class="hint">Drag the slider to explore memory cost at different sequence lengths</p>
+</section>
+
+<!-- ====== SLIDE 6: PREFILL QUADRATIC SCALING ====== -->
+<section>
+  <h2>Prefill: The Quadratic Wall</h2>
+  <div class="g2">
+    <div>
+      <p style="font-size:0.58em;color:var(--body);margin-bottom:10px;">Prefill ingests the full prompt before generating any output token. Attention is O(n²): every token attends to every other token.</p>
+      <canvas id="flopChart" height="210"></canvas>
+      <p class="hint">Attention score computations per head per layer (log scale)</p>
+    </div>
+    <div>
+      <table class="dt" style="margin-bottom:12px;">
+        <thead><tr><th>Context</th><th>Ops (per head/layer)</th><th>Relative</th></tr></thead>
+        <tbody>
+          <tr><td>4K tokens</td><td>16M</td><td class="good">1x</td></tr>
+          <tr><td>128K tokens</td><td>16.4B</td><td class="warn">1,024x</td></tr>
+          <tr><td>1M tokens</td><td>1T</td><td class="bad">62,500x</td></tr>
+        </tbody>
+      </table>
+      <div class="card" style="border-color:var(--red);">
+        <h3 style="color:var(--red);">Real Impact</h3>
+        <p>A 1M-token prompt can take 30+ minutes to prefill on hardware that handles 4K tokens in under a second. Prefill is compute-bound (unlike decoding, which is memory-bandwidth-bound). Quadratic scaling makes it the dominant bottleneck.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 7: TWO PATHS ====== -->
+<section>
+  <h2>Two Paths to Efficient Long-Context Inference</h2>
+  <div class="g2" style="margin-top:13px;align-items:stretch;">
+    <div style="border:2px solid var(--blue);border-radius:11px;padding:17px;background:#f0f5ff;">
+      <h3 style="color:var(--blue);font-size:0.78em;margin-bottom:10px;">Lossless <span style="background:var(--blue);border-radius:20px;padding:2px 9px;font-size:0.72em;color:#fff;margin-left:5px;">Exact</span></h3>
+      <p style="font-size:0.58em;color:var(--body);margin-bottom:10px;">Mathematically identical output to full attention. Distribute the work, not reduce it.</p>
+      <ul>
+        <li>Ring Attention: sequence sharded across a GPU ring</li>
+        <li>Striped Attention: causal-aware interleaved partition</li>
+        <li>Context Parallelism in vLLM, SGLang</li>
+      </ul>
+      <div style="margin-top:12px;font-size:0.46em;color:var(--dim);">Memory savings: linear with device count N</div>
+    </div>
+    <div style="border:2px solid var(--red);border-radius:11px;padding:17px;background:#fff5f5;">
+      <h3 style="color:var(--red);font-size:0.78em;margin-bottom:10px;">Lossy <span style="background:var(--red);border-radius:20px;padding:2px 9px;font-size:0.72em;color:#fff;margin-left:5px;">Approximate</span></h3>
+      <p style="font-size:0.58em;color:var(--body);margin-bottom:10px;">Compute a subset of attention. Trade small accuracy loss for large efficiency gain.</p>
+      <ul>
+        <li>NSA: hierarchical sparse attention (DeepSeek)</li>
+        <li>SwiftKV: skip later prefill layers (Snowflake)</li>
+        <li>StreamingLLM: attention sinks + sliding window</li>
+      </ul>
+      <div style="margin-top:12px;font-size:0.46em;color:var(--dim);">Speedup: 2x–12x depending on context and method</div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:13px;font-size:0.54em;color:var(--dim);">In practice: lossless methods keep the sequence in memory; lossy methods reduce per-token computation. Production systems combine both.</div>
+</section>
+
+<!-- ====== SECTION BREAK: LOSSLESS ====== -->
+<section class="sec-break" style="padding:50px 70px!important;display:flex!important;flex-direction:column;justify-content:center;align-items:center;">
+  <span class="sec-eyebrow">Part I</span>
+  <h1>Lossless Approaches</h1>
+  <p class="sec-sub">Context Parallelism: exact attention distributed across devices</p>
+</section>
+
+<!-- ====== SLIDE 8: CONTEXT PARALLELISM ====== -->
+<section>
+  <h2>Context Parallelism: Split Sequence, Share KV</h2>
+  <div class="g2">
+    <div>
+      <div class="math-box" style="font-size:0.84em;">
+        <div style="font-size:0.72em;color:var(--dim);margin-bottom:7px;">Sequence split across N=4 GPUs:</div>
+        \[Q=[Q_1,Q_2,Q_3,Q_4],\quad K=[K_1,K_2,K_3,K_4]\]
+        <div style="font-size:0.72em;color:var(--dim);margin-top:9px;margin-bottom:5px;">Memory per GPU:</div>
+        \[\frac{\text{Total KV}}{N}\]
+      </div>
+      <div class="card" style="margin-top:10px;">
+        <h3>Concrete Savings (Llama-3.1-8B, 128K)</h3>
+        <p>1 GPU: 32 GB — impossible once weights are loaded<br>
+        4 GPUs: 8 GB each — fits comfortably<br>
+        8 GPUs: 4 GB each — room for larger batches</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="border-color:var(--red);">
+        <h3 style="color:var(--red);">The Global Softmax Problem</h3>
+        <p>To compute GPU 1's final output, it needs all keys, not just its own:</p>
+      </div>
+      <div class="math-box" style="margin-top:9px;font-size:0.8em;">
+        \[\text{Out}_1=\text{softmax}\!\bigl(Q_1[K_1^\top,K_2^\top,\ldots]\bigr)[V_1,V_2,\ldots]\]
+      </div>
+      <p style="font-size:0.56em;color:var(--body);margin-top:9px;">Softmax requires the sum of exponentials across the entire sequence. GPU 1 only holds K₁. Naive block-split gives wrong denominators and incorrect outputs.</p>
+      <div class="card" style="margin-top:9px;border-color:var(--hl);">
+        <h3 style="color:var(--hl);">Ring Attention's Answer</h3>
+        <p>Rotate KV blocks around a ring. Accumulate partial softmax statistics using an online algorithm that can merge blocks in any order, exactly.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 9: RING ATTENTION ANIMATION ====== -->
+<section>
+  <h2>Ring Attention <span class="tag loss">Lossless</span></h2>
+  <div class="g2">
+    <div>
+      <svg id="ringViz" width="340" height="280" style="display:block;margin:0 auto;background:var(--math);border-radius:10px;border:1px solid var(--border);"></svg>
+      <div style="text-align:center;margin-top:8px;">
+        <button class="btn" onclick="ringStep()">Step</button>
+        <button class="btn ghost" onclick="ringReset()">Reset</button>
+        <span id="ringLbl" style="font-size:0.48em;color:var(--dim);margin-left:9px;">Round 0 of 3</span>
+      </div>
+      <p class="hint">Q blocks (blue) stay fixed. KV blocks (red) rotate clockwise each round.</p>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Algorithm</h3>
+        <p>
+          1. Each GPU holds a fixed query block Q_i.<br><br>
+          2. Over N-1 rounds, KV blocks pass clockwise: GPU i sends to GPU i+1, receives from GPU i-1 simultaneously.<br><br>
+          3. Each GPU computes blockwise attention against the current KV block, accumulating partial results.<br><br>
+          4. After N-1 rounds, every GPU has seen all KV blocks. Output is exact.
+        </p>
+      </div>
+      <div class="card" style="margin-top:9px;border-color:var(--hl);">
+        <h3 style="color:var(--hl);">Key Insight</h3>
+        <p>Attention between a query block and any set of KV blocks can be computed in any order, as long as the softmax statistics (running max, sum of exp, weighted output) are correctly merged after each block.</p>
+      </div>
+    </div>
+  </div>
+  <span class="cite">Liu et al., Ring Attention with Blockwise Transformers for Near-Infinite Context, ICLR 2024</span>
+</section>
+
+<!-- ====== SLIDE 10: ONLINE SOFTMAX MERGE ====== -->
+<section>
+  <h2>Online Softmax: Why the Math is Exact</h2>
+  <div class="g2">
+    <div>
+      <p style="font-size:0.58em;color:var(--body);margin-bottom:10px;">Standard softmax cannot be split. Online softmax maintains running statistics that can be merged in any order with zero error.</p>
+      <div class="math-box" style="font-size:0.82em;">
+        <div style="font-size:0.72em;color:var(--dim);margin-bottom:7px;">Each device tracks:</div>
+        \[m \leftarrow \max(\text{logits}),\quad s \leftarrow \textstyle\sum e^{x_i-m},\quad o \leftarrow \textstyle\sum a_i v_i\]
+        <div style="font-size:0.72em;color:var(--dim);margin:9px 0 5px;">When a new KV block arrives with max \(m'\):</div>
+        \[s_{\text{new}} = e^{m-m'}\,s + s'\]
+        \[o_{\text{new}} = \frac{e^{m-m'}\cdot s\cdot o\;+\;s'\cdot o'}{s_{\text{new}}}\]
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Why It Works</h3>
+        <p>Softmax scores depend on the global maximum logit m*. When a new block arrives with a higher max, we rescale prior partial sums by exp(m_old - m_new). This corrects the shifted denominator exactly, with no approximation.</p>
+      </div>
+      <div class="card" style="margin-top:9px;">
+        <h3>The Sequential Constraint</h3>
+        <p>No GPU can finalize its output until all N-1 KV blocks have passed through. Round k feeds into round k+1. This is the fundamental latency cost of Ring Attention.</p>
+      </div>
+      <div class="card" style="margin-top:9px;border-color:#b45309;">
+        <h3 style="color:#b45309;">Result</h3>
+        <p>Output is bit-for-bit identical to full single-device attention. Zero approximation. The only cost is KV block communication overhead.</p>
+      </div>
+    </div>
+  </div>
+  <span class="cite">Liu et al., Ring Attention, ICLR 2024</span>
+</section>
+
+<!-- ====== SLIDE 11: OVERLAP CONDITION + MEMORY ====== -->
+<section>
+  <h2>Communication Hidden by Computation</h2>
+  <div class="g2">
+    <div>
+      <p style="font-size:0.58em;color:var(--body);margin-bottom:10px;">While GPU i computes attention on the current KV block, it simultaneously sends that block to GPU i+1 and receives the next block from GPU i-1.</p>
+      <div class="math-box" style="font-size:0.86em;">
+        <div style="font-size:0.72em;color:var(--dim);margin-bottom:7px;">Block size c, hidden dim d, FLOP/s F, bandwidth B:</div>
+        <table style="width:100%;font-size:0.86em;border-collapse:collapse;">
+          <tr><td style="color:var(--hl);padding:3px 7px;">Compute time</td><td style="padding:3px 7px;">\(\dfrac{4dc^2}{F}\)</td></tr>
+          <tr><td style="color:#7c3aed;padding:3px 7px;">Transfer time</td><td style="padding:3px 7px;">\(\dfrac{4cd}{B}\)</td></tr>
+        </table>
+        <div style="border-top:1px solid var(--border);margin:9px 0;"></div>
+        <div style="color:#b45309;font-weight:600;">Overlap when: \(c \;\geq\; \dfrac{F}{B}\)</div>
+      </div>
+      <p style="font-size:0.54em;color:var(--body);margin-top:9px;">Compute scales as c², communication scales as c. The condition is easy to satisfy: block size only needs to exceed the compute-to-bandwidth ratio.</p>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Memory Per GPU: Always 6 Blocks</h3>
+        <p>Each GPU stores exactly:<br>
+        1 query block (stationary)<br>
+        2 current K, V blocks<br>
+        2 incoming K, V blocks (buffered)<br>
+        1 output accumulator</p>
+        <div style="margin-top:9px;background:var(--math);border-radius:5px;padding:7px 11px;border:1px solid var(--border);">
+          <span style="color:var(--hl);font-size:0.88em;font-weight:600;">Total = 6bch bytes</span>
+          <div style="font-size:0.76em;color:var(--dim);margin-top:2px;">Independent of total sequence length s</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:10px;">
+        <h3>Scaling Law</h3>
+        <p>If a model supports context s on 1 GPU, Ring Attention supports N·s on N GPUs with identical model flop utilization. Demonstrated beyond 100M tokens without approximation.</p>
+      </div>
+    </div>
+  </div>
+  <span class="cite">Liu et al., Ring Attention, ICLR 2024</span>
+</section>
+
+<!-- ====== SLIDE 12: STRIPED ATTENTION PROBLEM ====== -->
+<section>
+  <h2>Striped Attention: Fixing Causal Workload Imbalance <span class="tag loss">Lossless</span></h2>
+  <div class="g2">
+    <div>
+      <p style="font-size:0.58em;color:var(--body);margin-bottom:9px;">Causal attention masks all future tokens — halving total operations in theory. But Ring Attention with contiguous blocks cannot exploit this.</p>
+      <div class="math-box" style="font-size:0.84em;">
+        \[\text{CausalAttn}(Q,K,V)=\text{softmax}(QK^\top+C)\,V\]
+        <div style="font-size:0.72em;color:var(--dim);margin-top:7px;">C: upper triangle = -∞ (softmax → 0, skipped)</div>
+      </div>
+      <div class="card" style="margin-top:10px;border-color:var(--red);">
+        <h3 style="color:var(--red);">The Imbalance</h3>
+        <p>With contiguous blocks, some rounds give GPU A entirely masked interactions (zero work, finishes instantly) while GPU B gets entirely unmasked (full work). GPUs synchronize each round, so the slowest sets the pace. The 2x savings disappears.</p>
+      </div>
+    </div>
+    <div>
+      <img src="plots/fig4_striped_attention.png" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="Ring vs Striped attention workload">
+      <p class="figcap">Figure 4, Brandon et al. 2023. Round 2: Ring Attention has entirely masked (white) blocks on some devices; Striped maintains balanced half-filled patterns on every device every round.</p>
+    </div>
+  </div>
+  <span class="cite">Brandon et al., Striped Attention: Faster Ring Attention for Causal Transformers, 2023</span>
+</section>
+
+<!-- ====== SLIDE 13: STRIPED ATTENTION FIX ====== -->
+<section>
+  <h2>Striped Attention: Round-Robin Token Assignment</h2>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <h3>The Fix</h3>
+        <p>Assign tokens by position modulo N. For N=4:</p>
+      </div>
+      <div class="g2" style="margin-top:9px;gap:7px;">
+        <div class="card" style="border-color:var(--blue);background:#f0f5ff;">
+          <div style="color:var(--blue);font-size:0.6em;font-weight:700;margin-bottom:3px;">GPU 0</div>
+          <div style="font-size:0.54em;color:var(--body);">tokens 0, 4, 8, 12, ...</div>
+        </div>
+        <div class="card" style="border-color:var(--blue);background:#f0f5ff;">
+          <div style="color:var(--blue);font-size:0.6em;font-weight:700;margin-bottom:3px;">GPU 1</div>
+          <div style="font-size:0.54em;color:var(--body);">tokens 1, 5, 9, 13, ...</div>
+        </div>
+        <div class="card" style="border-color:var(--blue);background:#f0f5ff;">
+          <div style="color:var(--blue);font-size:0.6em;font-weight:700;margin-bottom:3px;">GPU 2</div>
+          <div style="font-size:0.54em;color:var(--body);">tokens 2, 6, 10, 14, ...</div>
+        </div>
+        <div class="card" style="border-color:var(--blue);background:#f0f5ff;">
+          <div style="color:var(--blue);font-size:0.6em;font-weight:700;margin-bottom:3px;">GPU 3</div>
+          <div style="font-size:0.54em;color:var(--body);">tokens 3, 7, 11, 15, ...</div>
+        </div>
+      </div>
+      <p style="font-size:0.56em;color:var(--body);margin-top:10px;">Every GPU holds tokens uniformly distributed across the full sequence. Its causal mask is roughly half-filled on every round.</p>
+      <div class="math-box" style="margin-top:9px;font-size:0.84em;">
+        Workload per device: \(\dfrac{c(c\pm 1)}{2}\) instead of worst-case \(c^2\)
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Why Exact</h3>
+        <p>Attention is permutation-equivariant in the key-value dimension. Permute tokens before splitting, unshuffle the output after. Identical to full causal attention.</p>
+      </div>
+      <div style="margin-top:12px;">
+        <table class="dt">
+          <thead><tr><th>Hardware</th><th>Sequence</th><th>Speedup over Ring</th></tr></thead>
+          <tbody>
+            <tr><td>8x A100</td><td>256K</td><td class="good">1.45x</td></tr>
+            <tr><td>16x TPUv4</td><td>786K</td><td class="good">1.65x</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card" style="margin-top:10px;">
+        <h3>Trend</h3>
+        <p>Speedup grows with sequence length and degree of sequence parallelism. At 786K tokens on 16 TPUs, 1.65x translates directly to reduced training cost.</p>
+      </div>
+    </div>
+  </div>
+  <span class="cite">Brandon et al., Striped Attention, 2023</span>
+</section>
+
+<!-- ====== SECTION BREAK: LOSSY ====== -->
+<section class="sec-break" style="padding:50px 70px!important;display:flex!important;flex-direction:column;justify-content:center;align-items:center;">
+  <span class="sec-eyebrow" style="color:#fca5a5;">Part II</span>
+  <h1>Lossy Approaches</h1>
+  <p class="sec-sub">Reduce computation itself rather than distributing it</p>
+</section>
+
+<!-- ====== SLIDE 14: NSA OVERVIEW ====== -->
+<section>
+  <h2>Native Sparse Attention (NSA) <span class="tag lossy">DeepSeek 2025</span></h2>
+  <div class="g2">
+    <div>
+      <p style="font-size:0.58em;color:var(--body);margin-bottom:10px;">First sparse attention method deployed in production at scale, in DeepSeek-V3.2. Unlike prior sparse methods applied post-hoc at inference, NSA is trained from scratch with sparse attention.</p>
+      <div class="card" style="border-color:var(--red);">
+        <h3 style="color:var(--red);">The Core Tension It Solves</h3>
+        <p>Prior methods either: (a) reduce theoretical FLOPs but scatter memory accesses with no real speedup, or (b) apply sparsity at inference only, introducing architectural mismatch. NSA is hardware-aligned and natively trainable.</p>
+      </div>
+      <div class="card" style="margin-top:9px;">
+        <h3>Arithmetic Intensity</h3>
+        <p>Prefill and training: compute-bound (high arithmetic intensity). Decoding: must reload full KV cache per step, memory-bandwidth-bound. NSA is co-designed for both regimes.</p>
+      </div>
+    </div>
+    <div>
+      <img src="plots/fig2_deepseek_nsa.png" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="NSA architecture">
+      <p class="figcap">Figure 2, Yuan et al. 2025. Three parallel attention branches: compressed (coarse global), selected (fine important blocks), sliding window (local). Green = computed, white = skipped.</p>
+    </div>
+  </div>
+  <span class="cite">Yuan et al., Native Sparse Attention: Hardware-Aligned and Natively Trainable Sparse Attention, DeepSeek 2025</span>
+</section>
+
+<!-- ====== SLIDE 15: NSA THREE BRANCHES ====== -->
+<section>
+  <h2>NSA: Three Branches, One Output</h2>
+  <div class="g3">
+    <div class="card" style="border-color:var(--hl);">
+      <h3 style="color:var(--hl);">1. Compressed (Coarse)</h3>
+      <p>Consecutive blocks aggregated into compressed representations by a learnable MLP. Overlapping strides prevent gaps. Captures broad global patterns without O(n²) cost.</p>
+      <div style="margin-top:9px;padding:5px 9px;background:var(--math);border-radius:5px;font-size:0.78em;color:var(--dim);">Purpose: global context at low cost</div>
+    </div>
+    <div class="card" style="border-color:#7c3aed;">
+      <h3 style="color:#7c3aed;">2. Selected (Fine)</h3>
+      <p>Compression scores reused to rank uncompressed blocks. Top-k blocks (not individual tokens) selected. Blockwise selection maintains contiguous memory access.</p>
+      <div style="margin-top:9px;padding:5px 9px;background:#f5f0ff;border-radius:5px;font-size:0.78em;color:var(--dim);">Purpose: exact detail missed by compression</div>
+    </div>
+    <div class="card" style="border-color:#059669;">
+      <h3 style="color:#059669;">3. Sliding Window (Local)</h3>
+      <p>Fixed window of recent tokens, isolated in its own branch. Separation prevents "shortcut learning" where local patterns drown out complex global ones.</p>
+      <div style="margin-top:9px;padding:5px 9px;background:#f0faf5;border-radius:5px;font-size:0.78em;color:var(--dim);">Purpose: local context stability</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:11px;">
+    <h3>Output Merge via Gating</h3>
+    <p style="font-size:0.58em;">Three branch outputs combined by a learned gate. Scores for block selection are aggregated across GQA groups so all heads within a group select identical blocks — the key that makes the kernel design viable: contiguous, predictable memory access patterns.</p>
+  </div>
+  <span class="cite">Yuan et al., Native Sparse Attention, DeepSeek 2025</span>
+</section>
+
+<!-- ====== SLIDE 16: NSA KERNEL + RESULTS ====== -->
+<section>
+  <h2>NSA: Group-Centric Kernel and Results</h2>
+  <div class="g2">
+    <div>
+      <div class="card" style="border-color:var(--red);">
+        <h3 style="color:var(--red);">Standard FlashAttention Fails Here</h3>
+        <p>FlashAttention loads contiguous Q blocks into SRAM. Sparse attention forces disjoint KV block fetches per query. Arithmetic intensity collapses; GPU becomes memory-bound.</p>
+      </div>
+      <div class="card" style="margin-top:9px;border-color:var(--hl);">
+        <h3 style="color:var(--hl);">Group-Centric Kernel (Triton)</h3>
+        <p>Flips the strategy: load all query heads within a GQA group simultaneously, then sequentially fetch the contiguous KV blocks they share. All heads in a group are guaranteed to select identical blocks, so no redundant fetches occur.</p>
+      </div>
+      <div class="card" style="margin-top:9px;">
+        <h3>Algorithm + Kernel Co-Design</h3>
+        <p>Blockwise selection ensures contiguous memory. GQA score aggregation ensures all heads agree on the same blocks. Together they maintain FlashAttention-level arithmetic intensity on sparse patterns.</p>
+      </div>
+    </div>
+    <div>
+      <table class="dt">
+        <thead><tr><th>Metric (64K context)</th><th>NSA vs Full Attn</th></tr></thead>
+        <tbody>
+          <tr><td>Training throughput</td><td class="good">9x faster</td></tr>
+          <tr><td>Decoding speed</td><td class="good">11.6x faster</td></tr>
+          <tr><td>General benchmarks</td><td class="good">matches or exceeds</td></tr>
+          <tr><td>Long-context retrieval</td><td class="good">perfect accuracy</td></tr>
+          <tr><td>Chain-of-thought math</td><td class="good">exceeds Full Attn</td></tr>
+        </tbody>
+      </table>
+      <div class="card" style="margin-top:12px;border-color:#b45309;">
+        <h3 style="color:#b45309;">Why Quality Improves</h3>
+        <p>Sparse patterns learned natively during pretraining: the model discovers which tokens genuinely matter. Irrelevant tokens excluded by the model itself, reducing noise.</p>
+      </div>
+    </div>
+  </div>
+  <span class="cite">Yuan et al., Native Sparse Attention, DeepSeek 2025</span>
+</section>
+
+<!-- ====== SLIDE 17: SWIFTKV MOTIVATION ====== -->
+<section>
+  <h2>SwiftKV: Later Layers Converge <span class="tag lossy">Snowflake 2024</span></h2>
+  <div class="g2">
+    <div>
+      <div class="card" style="border-color:var(--red);">
+        <h3 style="color:var(--red);">The Observation</h3>
+        <p>As tokens travel deeper into the model, their hidden states stop changing significantly. By the midpoint, each token's representation is already highly similar to its final-layer state.</p>
+      </div>
+      <div class="math-box" style="margin-top:10px;font-size:0.84em;">
+        <div style="font-size:0.72em;color:var(--dim);margin-bottom:7px;">Standard prefill:</div>
+        \[h^{(1)} \to h^{(2)} \to \cdots \to h^{(L)}\]
+        <div style="font-size:0.72em;color:var(--dim);margin:9px 0 5px;">SwiftKV: project KV for layers l+1...L from h^(l):</div>
+        \[h^{(l)} \;\xrightarrow{\text{project}}\; \text{KV}^{(l+1)},\ldots,\text{KV}^{(L)}\]
+      </div>
+      <div class="card" style="margin-top:9px;">
+        <h3>What Gets Skipped</h3>
+        <p>For prompt tokens in layers l+1 to L: attention, MLP, Q and output projections all skipped. Only K and V projections run, using h^(l) as input.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="border-color:var(--hl);">
+        <h3 style="color:var(--hl);">Decoding is Unchanged</h3>
+        <p>During decoding (generating new tokens), all L layers are used. SwiftKV only skips work during prefill of prompt tokens. Per-token generation quality is not affected.</p>
+      </div>
+      <div class="card" style="margin-top:9px;">
+        <h3>AcrossKV: Optional Memory Variant</h3>
+        <p>Instead of a separate KV cache per skipped layer, AcrossKV shares one KV cache across several consecutive layers. Compresses memory footprint further at the cost of slightly more approximation.</p>
+      </div>
+      <div class="card" style="margin-top:9px;">
+        <h3>Where It Fits</h3>
+        <p>Ideal for RAG and summarization: long prompts, short outputs. Prefill dominates total time; SwiftKV cuts 25-50% of that compute.</p>
+      </div>
+    </div>
+  </div>
+  <span class="cite">Qiao et al., SwiftKV: Fast Prefill-Optimized Inference, 2024</span>
+</section>
+
+<!-- ====== SLIDE 18: SWIFTKV RESULTS ====== -->
+<section>
+  <h2>SwiftKV: Recovery via Lightweight Distillation</h2>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <h3>Knowledge Distillation</h3>
+        <p>The architectural change initially drops accuracy. Recovery: freeze the original model as "teacher," fine-tune only the KV projection weights of skipped layers — less than 10% of total parameters. Train on fewer than 1B tokens. Completes in hours, not weeks.</p>
+      </div>
+      <div class="card" style="margin-top:10px;border-color:var(--hl);">
+        <h3 style="color:var(--hl);">Deployment: Zero Infrastructure Changes</h3>
+        <p>SwiftKV only changes which data feeds into which projection matrix, not the operations themselves. Drops into vLLM and SGLang without custom kernels or changed serving stacks.</p>
+      </div>
+    </div>
+    <div>
+      <table class="dt">
+        <thead><tr><th>Metric</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Prefill compute reduction</td><td class="good">25–50%</td></tr>
+          <tr><td>Aggregate throughput</td><td class="good">up to 2x</td></tr>
+          <tr><td>Time per output token</td><td class="good">60% lower</td></tr>
+          <tr><td>Normalized inference throughput</td><td class="good">560 TFlops/GPU</td></tr>
+          <tr><td>Llama-3.1-70B tokens/sec</td><td class="good">16K tokens/s</td></tr>
+          <tr><td>Benchmark quality loss</td><td class="warn">less than 2%</td></tr>
+          <tr><td>Model size range tested</td><td>3B to 405B</td></tr>
+        </tbody>
+      </table>
+      <div class="card" style="margin-top:11px;">
+        <h3>Open Source</h3>
+        <p>Available as the Arctic Inference plugin for vLLM from Snowflake. Production-deployed in Arctic model serving.</p>
+      </div>
+    </div>
+  </div>
+  <span class="cite">Qiao et al., SwiftKV, 2024 | Arctic Inference plugin for vLLM</span>
+</section>
+
+<!-- ====== SLIDE 19: STREAMING LLM ====== -->
+<section>
+  <h2>StreamingLLM: Infinite Context via Attention Sinks <span class="tag lossy">ICLR 2024</span></h2>
+  <div class="g2">
+    <div>
+      <div class="card" style="border-color:var(--red);">
+        <h3 style="color:var(--red);">Window Attention Fails</h3>
+        <p>Keep only the most recent N KV states. Constant memory. But once sequence exceeds cache size, model collapses: perplexity explodes. Absolute position embeddings no longer match.</p>
+      </div>
+      <div class="card" style="margin-top:9px;">
+        <h3>Attention Sinks</h3>
+        <p>Softmax requires scores to sum to 1. When no token is a strong match, the model dumps spare attention onto initial tokens as a "sink," even if semantically irrelevant. Replacing them with "\n" preserves the effect: position matters, not content.</p>
+      </div>
+      <div class="card" style="margin-top:9px;border-color:var(--hl);">
+        <h3 style="color:var(--hl);">The Fix</h3>
+        <p>Keep the first 4 tokens (sinks) permanently in the KV cache alongside a rolling window of recent tokens. Assign position indices relative to cache slots, not original sequence positions.</p>
+      </div>
+    </div>
+    <div>
+      <img src="plots/fig4_attention_sinks.png" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="StreamingLLM KV cache">
+      <p class="figcap">Figure 4, Xiao et al. 2023. KV cache = attention sinks (first 4 tokens) + rolling window. Position numbering restarts within the cache, not the global sequence.</p>
+      <table class="dt" style="margin-top:10px;">
+        <thead><tr><th>Result</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Max supported context</td><td class="good">4M+ tokens</td></tr>
+          <tr><td>vs sliding window recompute</td><td class="good">22.2x speedup</td></tr>
+          <tr><td>Fine-tuning required</td><td class="good">None</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <span class="cite">Xiao et al., Efficient Streaming Language Models with Attention Sinks, ICLR 2024</span>
+</section>
+
+<!-- ====== SECTION BREAK: INDUSTRY ====== -->
+<section class="sec-break" style="padding:50px 70px!important;display:flex!important;flex-direction:column;justify-content:center;align-items:center;">
+  <span class="sec-eyebrow">Part III</span>
+  <h1>Industry Deployment</h1>
+  <p class="sec-sub">How production systems combine these ideas</p>
+</section>
+
+<!-- ====== SLIDE 20: SGLANG CPP ====== -->
+<section>
+  <h2>SGLang: Chunked Pipeline Parallelism</h2>
+  <div class="g2">
+    <div>
+      <p style="font-size:0.58em;color:var(--body);margin-bottom:10px;">Serving a 100-layer model across 4 servers on a 100K-token prompt: how do you keep all servers busy?</p>
+      <div class="card">
+        <h3>Pipeline Parallelism (PP)</h3>
+        <p>Layer groups split across servers over slow inter-server links. Server 1: layers 1-25, Server 2: 26-50, etc. Naive PP: Server 1 processes the full 100K prompt while Servers 2-4 sit completely idle. This is the pipeline bubble.</p>
+      </div>
+      <div class="card" style="margin-top:9px;border-color:var(--hl);">
+        <h3 style="color:var(--hl);">Chunked PP: The Fix</h3>
+        <p>Slice the prompt into 4K-token chunks. Server 1 processes chunk 1 through layers 1-25, passes to Server 2, immediately picks up chunk 2. By the time chunk 1 reaches Server 4, all four servers work simultaneously on different chunks.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Context Parallelism (CP) Within a Server</h3>
+        <p>Inside each server, GPUs use NVLink (~900 GB/s) to run Ring/Striped Attention on each chunk in parallel. NVLink makes the per-step KV rotation cheap. Cross-server PP uses slower InfiniBand links but avoids the KV rotation cost entirely.</p>
+      </div>
+      <div class="card" style="margin-top:9px;border-color:#b45309;">
+        <h3 style="color:#b45309;">Hybrid CP x PP</h3>
+        <p>Within each server: CP (NVLink) for sequence splitting. Across servers: Chunked PP for model depth. Software topology matches hardware topology. GPUs never idle, never OOM.</p>
+      </div>
+      <div style="margin-top:10px;padding:8px 13px;background:var(--math);border-radius:6px;font-size:0.46em;color:var(--dim);border:1px solid var(--border);">
+        LMSYS Blog: Chunked Pipeline Parallelism, January 2026
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SLIDE 21: VLLM VS SGLANG ====== -->
+<section>
+  <h2>vLLM vs SGLang: The Current Tension</h2>
+  <div class="g2" style="align-items:stretch;">
+    <div style="border:2px solid var(--blue);border-radius:11px;padding:16px;background:#f0f5ff;">
+      <h3 style="color:var(--blue);font-size:0.78em;margin-bottom:9px;">vLLM: Betting on Context Parallelism</h3>
+      <p style="font-size:0.56em;color:var(--body);margin-bottom:9px;">Ring and Striped Attention as the primary strategy. Issue #22693 vs #34018: Helix (NVIDIA, 2025) proposes replacing the ring topology with All-to-All communication, where every GPU sends its partial attention output and log-sum-exp factor to every other GPU simultaneously, reducing per-round latency.</p>
+      <ul>
+        <li>Ring/Striped enabled by default for long-context serving</li>
+        <li>Day-0 vLLM support for DeepSeek NSA</li>
+      </ul>
+    </div>
+    <div style="border:2px solid var(--red);border-radius:11px;padding:16px;background:#fff5f5;">
+      <h3 style="color:var(--red);font-size:0.78em;margin-bottom:9px;">SGLang: Betting on Pipeline Parallelism</h3>
+      <p style="font-size:0.56em;color:var(--body);margin-bottom:9px;">Chunked PP favors model-layer sharding across servers. Maps better to cluster topologies where inter-server bandwidth is constrained relative to intra-server NVLink speed.</p>
+      <ul>
+        <li>CPP eliminates pipeline bubbles at long context</li>
+        <li>CP within servers over NVLink remains fast</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="margin-top:12px;border-color:#b45309;">
+    <h3 style="color:#b45309;">The Convergence</h3>
+    <p style="font-size:0.58em;">Both teams acknowledge the future is hybrid CP x PP. The debate is which dimension to optimize first given today's hardware. The correct answer depends on the interconnect: NVLink makes CP cheap within a server; InfiniBand makes PP cheaper across servers.</p>
+  </div>
+</section>
+
+<!-- ====== SLIDE 22: SUMMARY ====== -->
+<section>
+  <h2>The Quality-Efficiency Frontier</h2>
+  <div class="g2">
+    <div>
+      <table class="dt">
+        <thead><tr><th>Method</th><th>Loss</th><th>Gain</th><th>Best Workload</th></tr></thead>
+        <tbody>
+          <tr><td>Ring Attention</td><td class="good">None</td><td>Nx memory</td><td>Training, exact inference</td></tr>
+          <tr><td>Striped Attention</td><td class="good">None</td><td>1.65x over Ring</td><td>Causal LM training</td></tr>
+          <tr><td>NSA</td><td class="warn">Minimal</td><td>9-12x at 64K</td><td>Pretraining, long decode</td></tr>
+          <tr><td>SwiftKV</td><td class="warn">Less than 2%</td><td>2x throughput</td><td>RAG, summarization</td></tr>
+          <tr><td>StreamingLLM</td><td class="bad">Moderate</td><td>22x vs recompute</td><td>Infinite streaming</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:12px;padding:10px 14px;background:var(--math);border-radius:7px;font-size:0.54em;color:var(--body);border:1px solid var(--border);">
+        In practice: lossless methods fit the sequence in memory; lossy methods reduce per-token computation. Production systems combine both.
+      </div>
+    </div>
+    <div>
+      <div class="card" style="border-color:var(--hl);">
+        <h3 style="color:var(--hl);">Open Problems</h3>
+        <ul>
+          <li>Optimal CP x PP hybrid scheduling</li>
+          <li>NSA sparsity patterns across task types</li>
+          <li>SwiftKV: optimal layer cutoff per model</li>
+          <li>Helix All-to-All vs ring topology tradeoffs</li>
+          <li>Attention sinks in non-standard training regimes</li>
+        </ul>
+      </div>
+      <div class="card" style="margin-top:10px;">
+        <h3>The Goal: Achieved?</h3>
+        <p>For most practical workloads: yes. A 128K-token request that once required 30+ minutes of prefill and 32 GB of KV cache now runs at practical latency on standard clusters. The 1M-token frontier is still being pushed.</p>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:10px;font-size:0.42em;color:var(--dim);">
+    Ring Attention (ICLR 2024) · Striped Attention (2023) · NSA / DeepSeek (2025) · SwiftKV / Snowflake (2024) · StreamingLLM (ICLR 2024) · SGLang CPP (LMSYS 2026)
+  </div>
+</section>
+
+</div><!-- .slides -->
+</div><!-- .reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reveal.js"></script>
+<script>
+Reveal.initialize({
+  transition: 'none',
+  transitionSpeed: 'fast',
+  slideNumber: 'c/t',
+  hash: true,
+  width: 1280,
+  height: 720,
+  margin: 0.04,
+  minScale: 0.1,
+  maxScale: 2.0,
+  center: false,
+  plugins: []
+});
+
+/* -------- Context length chart -------- */
+function initCtxChart() {
+  const el = document.getElementById('ctxChart');
+  if (!el || el._done) return;
+  el._done = true;
+  const labels = ['GPT-1 (2018)','GPT-3 (2020)','GPT-4 (2023)','Claude 2 (2023)','Qwen2.5 (2024)','Gemini 1.5 (2024)','Llama 4 (2025)'];
+  const vals   = [512, 2048, 128000, 100000, 128000, 1000000, 1000000];
+  const colors = vals.map(v => v >= 500000 ? '#c62828' : v >= 100000 ? '#b45309' : '#1565c0');
+  new Chart(el, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 5 }] },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => {
+              const v = c.raw;
+              return v >= 1e6 ? `${v/1e6}M tokens` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K tokens` : `${v} tokens`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          type: 'logarithmic',
+          ticks: { color: '#8a7a72', callback: v => v>=1e6?`${v/1e6}M`:v>=1e3?`${v/1e3}K`:v },
+          grid: { color: '#e2d5c8' }
+        },
+        x: { ticks: { color: '#6b5e56', font: { size: 11 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+/* -------- FLOP scaling chart -------- */
+function initFlopChart() {
+  const el = document.getElementById('flopChart');
+  if (!el || el._done) return;
+  el._done = true;
+  new Chart(el, {
+    type: 'bar',
+    data: {
+      labels: ['4K tokens', '128K tokens', '1M tokens'],
+      datasets: [{
+        data: [16e6, 16.4e9, 1e12],
+        backgroundColor: ['#1565c0', '#b45309', '#c62828'],
+        borderRadius: 5
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => {
+              const v = c.raw;
+              if (v >= 1e12) return `${(v/1e12).toFixed(0)}T ops`;
+              if (v >= 1e9)  return `${(v/1e9).toFixed(1)}B ops`;
+              return `${(v/1e6).toFixed(0)}M ops`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          type: 'logarithmic',
+          ticks: {
+            color: '#8a7a72',
+            callback: v => {
+              const map = {1e6:'1M',1e7:'10M',1e8:'100M',1e9:'1B',1e10:'10B',1e11:'100B',1e12:'1T'};
+              return map[v] || null;
+            }
+          },
+          grid: { color: '#e2d5c8' }
+        },
+        x: { ticks: { color: '#6b5e56', font: { size: 13 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+/* -------- KV slider -------- */
+const seqMap = [1000, 4000, 10000, 32000, 128000, 256000, 1000000];
+const slider = document.getElementById('seqSlider');
+
+function updateKV() {
+  const idx = parseInt(slider.value);
+  const seq = seqMap[idx];
+  const mb  = seq * 0.25;
+  const gb  = mb / 1000;
+
+  let disp, unit;
+  if (gb < 1) { disp = mb.toFixed(0); unit = 'MB'; }
+  else         { disp = gb >= 10 ? gb.toFixed(0) : gb.toFixed(1); unit = 'GB'; }
+
+  const color = gb > 80 ? '#c62828' : gb > 30 ? '#b45309' : '#15803d';
+  document.getElementById('kvNum').textContent = disp;
+  document.getElementById('kvNum').style.color = color;
+  document.getElementById('kvUnit').textContent = unit;
+  document.getElementById('kvLabel').textContent = seq.toLocaleString() + ' tokens';
+  document.getElementById('kvSeqVal').textContent = seq.toLocaleString();
+  document.getElementById('kvCalc').textContent = disp + ' ' + unit;
+}
+
+if (slider) { slider.addEventListener('input', updateKV); updateKV(); }
+
+/* -------- Ring Attention D3 animation -------- */
+const N_GPUS = 4;
+let ringRound = 0;
+
+function drawRing() {
+  const svg = d3.select('#ringViz');
+  if (svg.empty()) return;
+  svg.selectAll('*').remove();
+
+  const W = 340, H = 280, cx = W/2, cy = H/2, R = 98;
+  const angles = d3.range(N_GPUS).map(i => (i / N_GPUS) * 2 * Math.PI - Math.PI/2);
+  const pos = angles.map(a => ({ x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }));
+
+  for (let i = 0; i < N_GPUS; i++) {
+    const j = (i + 1) % N_GPUS;
+    const mx = (pos[i].x + pos[j].x) / 2;
+    const my = (pos[i].y + pos[j].y) / 2;
+    svg.append('line')
+      .attr('x1', pos[i].x).attr('y1', pos[i].y)
+      .attr('x2', pos[j].x).attr('y2', pos[j].y)
+      .attr('stroke', '#c8b8a8').attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '5,4');
+    svg.append('text')
+      .attr('x', mx).attr('y', my)
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+      .attr('fill', '#c62828').attr('font-size', '13px')
+      .text('→');
+  }
+
+  svg.append('text')
+    .attr('x', cx).attr('y', cy - 6)
+    .attr('text-anchor', 'middle').attr('fill', '#b0a098')
+    .attr('font-size', '11px').text('KV blocks');
+  svg.append('text')
+    .attr('x', cx).attr('y', cy + 10)
+    .attr('text-anchor', 'middle').attr('fill', '#b0a098')
+    .attr('font-size', '11px').text('rotate →');
+
+  pos.forEach((p, i) => {
+    const g = svg.append('g');
+    g.append('circle')
+      .attr('cx', p.x).attr('cy', p.y).attr('r', 38)
+      .attr('fill', '#ffffff').attr('stroke', '#1565c0').attr('stroke-width', 2);
+    g.append('text')
+      .attr('x', p.x).attr('y', p.y - 13)
+      .attr('text-anchor', 'middle').attr('fill', '#1565c0')
+      .attr('font-size', '11px').attr('font-weight', 'bold')
+      .text('GPU ' + i);
+    g.append('text')
+      .attr('x', p.x).attr('y', p.y + 2)
+      .attr('text-anchor', 'middle').attr('fill', '#4a3f38')
+      .attr('font-size', '10px')
+      .text('Q' + i + ' (fixed)');
+    const kvIdx = ((i - ringRound) % N_GPUS + N_GPUS) % N_GPUS;
+    g.append('text')
+      .attr('x', p.x).attr('y', p.y + 16)
+      .attr('text-anchor', 'middle').attr('fill', '#c62828')
+      .attr('font-size', '11px').attr('font-weight', 'bold')
+      .text('KV' + kvIdx);
+  });
+}
+
+function ringStep() {
+  if (ringRound < N_GPUS - 1) ringRound++;
+  document.getElementById('ringLbl').textContent = 'Round ' + ringRound + ' of ' + (N_GPUS-1);
+  drawRing();
+}
+
+function ringReset() {
+  ringRound = 0;
+  document.getElementById('ringLbl').textContent = 'Round 0 of ' + (N_GPUS-1);
+  drawRing();
+}
+
+Reveal.on('slidechanged', e => {
+  const s = e.currentSlide;
+  if (s.querySelector('#ctxChart'))  initCtxChart();
+  if (s.querySelector('#flopChart')) initFlopChart();
+  if (s.querySelector('#ringViz'))   drawRing();
+});
+Reveal.on('ready', e => {
+  const s = e.currentSlide;
+  if (s.querySelector('#ctxChart'))  initCtxChart();
+  if (s.querySelector('#flopChart')) initFlopChart();
+  if (s.querySelector('#ringViz'))   drawRing();
+});
+</script>
+</body>
+</html>
