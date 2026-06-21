@@ -132,7 +132,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
     </div>
   </div>
   <div style="margin-top:11px;padding:9px 15px;background:var(--math);border-left:4px solid var(--hl);border-radius:6px;font-size:0.54em;color:var(--body);">
-    <b>Scale:</b> 128K tokens ≈ a full-length novel (96K English words). 1M tokens ≈ 750 pages.
+    <b>Scale:</b> 128K tokens ≈ a full-length novel (96K English words). 1M tokens ≈ 750 words.
   </div>
 </section>
 
@@ -150,7 +150,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
         <li><span style="color:#059669;font-weight:700;">V</span> — the actual content of those tokens</li>
       </ul>
       <div style="margin-top:7px;font-size:0.51em;color:var(--body);">
-        1. During autoregressive generation, each transformer layer computes key and value vectors from the input, whcih are cached in GPU memory to avoid recomputation at each step. 
+        1. During autoregressive generation, each transformer layer computes key and value vectors from the input, which are cached in GPU memory to avoid recomputation at each step. 
       </div>
       <div style="margin-top:7px;font-size:0.51em;color:var(--body);">
         2. During decoding, the per-step complexity lowers from O(n²) to O(n), but at the cost of storing all those tensors. 
@@ -182,7 +182,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
           <tr><td>1,000</td><td class="good">0.25 GB</td><td>Fits easily</td></tr>
           <tr><td>10,000</td><td class="good">2.5 GB</td><td>Comfortable</td></tr>
           <tr><td>128,000</td><td class="warn">32 GB</td><td>Full H100</td></tr>
-          <tr><td><b>1,000,000</b></td><td class="bad"><b>250 GB</b></td><td>3× H100s, KV only</td></tr>
+          <tr><td><b>1,000,000</b></td><td class="bad"><b>250 GB</b></td><td>4× H100s, KV only</td></tr>
         </tbody>
       </table>
     </div>
@@ -318,7 +318,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
     </div>
   </div>
   <div class="card" style="margin-top:8px;">
-        <p><strong>The Sequential Constraint:</strong> GPU can finalize its output until all N−1 KV blocks have rotated through. Round k feeds into round k+1. This is the fundamental latency cost of Ring Attention.</p>
+        <p><strong>The Sequential Constraint:</strong> GPU cannot finalize its output until all N−1 KV blocks have rotated through. Round k feeds into round k+1. This is the fundamental latency cost of Ring Attention.</p>
       </div>
   <span class="cite">Liu et al., Ring Attention with Blockwise Transformers for Near-Infinite Context, ICLR 2024</span>
 </section>
@@ -351,7 +351,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
       <div class="math-box" style="font-size:0.79em;">
         <div style="font-size:0.68em;color:var(--dim);">Each device tracks:</div>
         \[m \leftarrow \max(\text{logits}),\quad s \leftarrow \textstyle\sum e^{x_i-m},\quad o \leftarrow \textstyle\sum a_i v_i\]
-        <div style="font-size:0.68em;color:var(--dim);margin:7px 0 4px;">When new KV block arrives with its own statistics (\(m'\), \(s'\), \(o'\)):</div>
+        <div style="font-size:0.68em;color:var(--dim);margin:7px 0 4px;">When new KV block arrives with its own statistics (\(m'\), \(s'\), \(o'\)) and if \(m'\) is the new global max \(m^*\), then:</div>
         \[s_{\text{new}} = e^{m-m'} \cdot \,s + s'\]
         \[o_{\text{new}} = \frac{e^{m-m'}\cdot s\cdot o\;+\;s'\cdot o'}{s_{\text{new}}}\]
       </div>
@@ -389,7 +389,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
         <p><strong>Memory Requirements:</strong> Each host (GPU) needs to hold 6 blocks:</p>
         <p>1 query block (stationary) + 2 current K,V blocks + 2 incoming K,V blocks (buffered) + 1 output accumulator</p>
         <p><strong>Total = 6bch bytes</strong></p>
-        <div style="font-size:0.48em;color:var(--dim);margin-top:7px;">Independent of sequence size; b: batch size, c: block size, d: hidden dimension</div>
+        <div style="font-size:0.48em;color:var(--dim);margin-top:7px;">Independent of sequence size; b: batch size, c: block size, h: hidden dimension</div>
       </div>
       <div>
         <div class="card" style="border-color:var(--hl);margin-top:9px;">
@@ -489,7 +489,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
 
 <!-- ====== SECTION BREAK: LOSSY ====== -->
 <section class="sec-break" style="padding:200px 60px;height:100%!important;display:flex!important;flex-direction:column;justify-content:center;align-items:center;">
-  <span class="sec-eyebrow" style="color:var(--red);">Part II</span>
+  <span class="sec-eyebrow">Part II</span>
   <h1>Lossy Approaches</h1>
   <p class="sec-sub">Reduce computation itself rather than distributing it</p>
 </section>
