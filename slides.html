@@ -423,14 +423,14 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
     <div style="display:flex;flex-direction:column;align-items:center;">
       <img src="plots/fig4_a_striped_attention.png" style="width:75%;border-radius:6px;border:1px solid var(--border);" alt="Ring Attention workload">
-      <p class="figcap">(a) Ring Attention — Round 2 shows some GPUs with entirely masked (white) blocks</p>
+      <p class="figcap">(a) Ring Attention — Round 2 shows some GPUs with entirely masked (grey) blocks</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:center;">
       <img src="plots/fig4_b_striped_attention.png" style="width:75%;border-radius:6px;border:1px solid var(--border);" alt="Striped Attention workload">
       <p class="figcap">(b) Striped Attention — Every GPU maintains balanced half-filled patterns every round</p>
     </div>
   </div>
-  <p class="figcap" style="font-size:0.42em;margin-top:4px;">Figure 4, Brandon et al. 2023. Colors = which GPU computes each query/key pair. White = masked by causal mask. Striped eliminates idle rounds entirely.</p>
+  <p class="figcap" style="font-size:0.42em;margin-top:4px;">Figure 4, Brandon et al. 2023. The rows are the "Queries" (the current tokens being processed) and the columns are the "Keys" (the past tokens they are looking at). <br>Colors = which GPU computes each query/key pair. Grey = masked by causal mask. Striped eliminates idle rounds entirely.</p>
   <span class="cite">Brandon et al., Striped Attention: Faster Ring Attention for Causal Transformers, 2023</span>
 </section>
 
@@ -497,30 +497,39 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
 <!-- ====== SLIDE 13: NSA OVERVIEW ====== -->
 <section>
   <h2>Native Sparse Attention (NSA) <span class="tag lossy">DeepSeek 2025</span></h2>
-  <p style="font-size:0.53em;color:var(--body);margin-bottom:8px;">First sparse attention deployed in production at scale (DeepSeek-V3.2). Unlike prior methods that bolt on sparsity after training, NSA is trained from scratch — the model learns <em>which</em> tokens matter.</p>
-  <div class="g2" style="margin-top:6px;">
+  <p style="font-size:0.53em;color:var(--body);margin-bottom:8px;">First sparse attention deployed in production at scale (DeepSeek-V3.2). <br>Unlike prior methods that bolt on sparsity after training, NSA is trained from scratch — the model learns <em>which</em> tokens matter.</p>
+  <div class="g2" style="margin-top:6px;margin-bottom:9px;align-items:start;">
     <div class="card" style="border-color:var(--red);">
-      <h3 style="color:var(--red);">Why Prior Sparse Methods Fail</h3>
-      <p>Post-hoc sparse methods either scatter memory accesses (destroying arithmetic intensity, no real speedup) or introduce train/inference mismatch. NSA is hardware-aligned and natively trainable.</p>
+      <h3 style="color:var(--red); margin-bottom: 8px;">Why Prior Sparse Methods Fail</h3>
+      <ul style="margin-bottom: 0; padding-left: 20px; line-height: 1.5; font-size: 0.9em; color: var(--body);">
+        <li style="margin-bottom: 8px;"><strong>Train/Inference Mismatch:</strong> Bolting sparsity onto a dense model at inference time carries architectural bias and limits accuracy.</li>
+        <li><strong>Hardware Inefficiency:</strong> Random memory access destroys <em>arithmetic intensity</em>. GPUs stall while fetching fragmented data instead of doing math.</li>
+      </ul>
     </div>
     <div class="card" style="border-color:var(--hl);">
-      <h3 style="color:var(--hl);">Arithmetic Intensity</h3>
-      <p>Prefill/training: compute-bound (high intensity). Decoding: memory-bound (must reload full KV cache per step). NSA is co-designed for both regimes.</p>
+      <p><strong>Arithmetic Intensity: </strong>Ratio of math operations to memory fetches, dictates what bottlenecks your GPU: </p>
+        <ul style="margin-bottom: 0; padding-left: 20px; line-height: 1.5; font-size: 0.9em; color: var(--body);">
+        <li style="margin-bottom: 8px;"><strong>Compute-bound (High Intensity / Prefill):</strong> GPU has enough data and is maxing out its processors. Happens during LLM training and prefill, where large batches are processed at once.</li>
+        <li><strong>Memory-bound (Low Intensity / Decoding):</strong> GPU finishes math instantly and sits idle waiting for data to load. Happens during LLM decoding, because generating just one single token requires fetching the entire KV-cache from memory.</li>
+      </ul>
     </div>
   </div>
-  <div class="g3" style="margin-top:9px;">
-    <div class="card" style="border-color:var(--hl);">
+  <div class="card">
+    <h3>NSA splits attention into three parallel branches: </h3>
+    <div class="g3" style="margin-top:9px;">
+    <div class="card">
       <h3 style="color:var(--hl);">1. Compression (Coarse)</h3>
       <p>Token blocks compressed into single representations by a learnable MLP with overlapping strides. Panoramic view of the full context at low compute cost.</p>
     </div>
-    <div class="card" style="border-color:#7c3aed;">
+    <div class="card">
       <h3 style="color:#7c3aed;">2. Block Selection (Fine)</h3>
-      <p>Compression scores reused to rank uncompressed blocks. Top-k selected at full resolution. Blockwise and GQA-aligned — contiguous reads, FlashAttention-friendly.</p>
+      <p>Compression scores reused to rank uncompressed blocks. Top-k selected at full resolution. Blockwise and GQA-aligned: contiguous reads, FlashAttention-friendly.</p>
     </div>
-    <div class="card" style="border-color:#059669;">
+    <div class="card">
       <h3 style="color:#059669;">3. Sliding Window (Local)</h3>
-      <p>Fixed window of recent tokens in an isolated branch — prevents the model taking a "local shortcut" and skipping the global branches during training.</p>
+      <p>Fixed window of recent tokens in an isolated branch: prevents the model taking a "local shortcut" and skipping the global branches during training.</p>
     </div>
+  </div>
   </div>
   <span class="cite">Yuan et al., Native Sparse Attention: Hardware-Aligned and Natively Trainable Sparse Attention, DeepSeek 2025</span>
 </section>
