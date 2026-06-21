@@ -518,16 +518,16 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
     <h3>NSA splits attention into three parallel branches: </h3>
     <div class="g3" style="margin-top:9px;">
     <div class="card">
-      <h3 style="color:var(--hl);">1. Compression (Coarse)</h3>
-      <p>Token blocks compressed into single representations by a learnable MLP with overlapping strides. Panoramic view of the full context at low compute cost.</p>
+      <!-- <h3 style="color:var(--hl);">1. Compression (Coarse)</h3> -->
+      <p><strong>1. Compression (Coarse)</strong>: Token blocks compressed into single representations by a learnable MLP with overlapping strides. Panoramic view of the full context at low compute cost.</p>
     </div>
     <div class="card">
-      <h3 style="color:#7c3aed;">2. Block Selection (Fine)</h3>
-      <p>Compression scores reused to rank uncompressed blocks. Top-k selected at full resolution. Blockwise and GQA-aligned: contiguous reads, FlashAttention-friendly.</p>
+      <!-- <h3 style="color:#7c3aed;">2. Block Selection (Fine)</h3> -->
+      <p><strong style="color:#7c3aed;">2. Block Selection (Fine)</strong>: Compression scores reused to rank uncompressed blocks. Top-k selected at full resolution. Blockwise contiguous reads, FlashAttention friendly.</p>
     </div>
     <div class="card">
-      <h3 style="color:#059669;">3. Sliding Window (Local)</h3>
-      <p>Fixed window of recent tokens in an isolated branch: prevents the model taking a "local shortcut" and skipping the global branches during training.</p>
+      <!-- <h3 style="color:#059669;">3. Sliding Window (Local)</h3> -->
+      <p><strong style="color:#059669;">3. Sliding Window (Local)</strong>: Fixed window of recent tokens in an isolated branch: prevents the model taking a "local shortcut" and skipping the global branches during training.</p>
     </div>
   </div>
   </div>
@@ -539,7 +539,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <h2>NSA: Architecture at a Glance</h2>
   <div class="card" style="margin-bottom:10px;">
     <h3>Output Merge via Learned Gating</h3>
-    <p style="font-size:0.6em;">Three branch outputs combined by a learned gate. The GQA group constraint — all heads select identical blocks — is not just algorithmic: it is a hardware prerequisite that keeps KV reads contiguous and eliminates redundant memory transfers in the custom Triton kernel.</p>
+    <p style="font-size:0.6em;">Three branch outputs combined by a learned gate. All heads select identical blocks is not just algorithmic: it is a hardware prerequisite that keeps KV reads contiguous and eliminates redundant memory transfers in the custom kernel.</p>
   </div>
   <img src="plots/fig2_deepseek_nsa.png" style="width:100%;max-height:400px;object-fit:contain;border-radius:8px;border:1px solid var(--border);display:block;margin:0 auto;" alt="NSA architecture">
   <p class="figcap" style="margin-top:8px;font-size:0.54em;">Figure 2, Yuan et al. 2025. Three parallel branches: compressed (coarse global), selected (important exact blocks), sliding window (local). Green tiles = computed; white tiles = skipped. All three outputs are merged by a learned gate.</p>
@@ -549,15 +549,20 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
 <!-- ====== SLIDE 15: NSA KERNEL + RESULTS ====== -->
 <section>
   <h2>NSA: Group-Centric Kernel and Results</h2>
+  <div class="card" style="border-color:var(--red);">
+        <!-- <h3 "></h3> -->
+        <p><strong style="color:var(--red);">Why Standard FlashAttention Fails?</strong> FlashAttention streams contiguous KV blocks. Sparse selection needs disjoint fragments for different query positions and scattered reads destroy arithmetic intensity.</p>
+      </div>
   <div class="g2" style="align-items:start;">
     <div>
-      <div class="card" style="border-color:var(--red);">
-        <h3 style="color:var(--red);">Why Standard FlashAttention Fails</h3>
-        <p>FlashAttention streams contiguous KV blocks. Sparse selection needs disjoint fragments for different query positions — scattered reads destroy arithmetic intensity.</p>
+      
+      <div class="card" style="margin-top:8px;border-color:var(--hl);">
+        <h3 style="color:var(--hl);">NSA's Group-Centric Kernel (Triton)</h3>
+        <p><strong>Loading Strategy:</strong> Instead of grouping by timestamp (all queries at similar positions), NSA groups by GQA head group (all query heads that share a KV-cache) and loads all heads at once, then fetches the contiguous KV blocks they all share. Zero redundant transfers.</p>
       </div>
       <div class="card" style="margin-top:8px;border-color:var(--hl);">
-        <h3 style="color:var(--hl);">Group-Centric Kernel (Triton)</h3>
-        <p>Flips the strategy: loads all heads of a GQA group at once, then fetches the contiguous KV blocks they all share. Zero redundant transfers — FlashAttention-level intensity on sparse patterns.</p>
+        <!-- <h3 style="color:var(--hl);"></h3> -->
+        <p><strong>Algorithmic Constraints</strong> are strict hardware prerequisites designed to maximize memory efficiency. <br><strong>Blockwise selection</strong> ensures the GPU fetches data in large, contiguous chunks, while <strong>per-group aggregation</strong> forces all heads in a group to request those exact same chunks, preventing scattered memory reads. <br> Together, these allow the <strong>custom kernels</strong> to process it at near-FlashAttention speeds alongside the naturally contiguous compression and sliding window branches.</p>
       </div>
     </div>
     <div>
@@ -572,7 +577,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
         </tbody>
       </table>
       <div class="card" style="margin-top:8px;border-color:#b45309;">
-        <h3 style="color:#b45309;">Why Quality Can Improve</h3>
+        <h3 style="color:#b45309;">Results</h3>
         <p>Sparse patterns learned natively during pretraining: the model discovers which tokens genuinely matter, reducing attention noise.</p>
       </div>
     </div>
@@ -587,7 +592,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
     <div>
       <div class="card" style="border-color:var(--red);">
         <h3 style="color:var(--red);">The Observation</h3>
-        <p>As tokens travel through layers, their hidden states — each token's internal vector representation — stop changing significantly. By the midpoint of the model, each token's representation is already close to its final-layer state.</p>
+        <p>As tokens travel through layers, their hidden states: each token's internal vector representation stop changing significantly. By the midpoint of the model, each token's representation is already close to its final-layer state.</p>
       </div>
       <div class="math-box" style="margin-top:9px;font-size:0.83em;">
         <div style="font-size:0.69em;color:var(--dim);margin-bottom:5px;">Standard prefill — all L layers run for every token:</div>
@@ -829,7 +834,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
 <section class="sec-break" style="padding:200px 60px;height:100%!important;display:flex!important;flex-direction:column;justify-content:center;align-items:center;">
   <h1 style="color:#fff;font-size:2.6em;margin-bottom:0.15em;">Thank You</h1>
   <p class="sec-sub" style="font-size:1em;margin-top:6px;">Questions?</p>
-  <div style="margin-top:2em;font-size:0.37em;color:rgba(255,255,255,0.45);">Long-Context LLM Inference · University of Tübingen · Summer 2026</div>
+  <div style="margin-top:2em;font-size:0.37em;color:rgba(255,255,255,0.45);">Long-Context Inference · University of Tübingen · Summer 2026</div>
 </section>
 
 </div><!-- .slides -->
