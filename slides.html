@@ -266,8 +266,9 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
         \[\frac{\text{Total KV}}{N}\]
       </div>
       <div class="card" style="margin-top:9px;">
-        <h3>Concrete Savings (Llama-3.1-8B, 128K)</h3>
-        <p>1 GPU: 32 GB — impossible once weights are loaded<br>
+        <!-- <h3>Concrete Savings (Llama-3.1-8B, 128K)</h3> -->
+        <p><strong>Concrete Savings (Llama-3.1-8B, 128K)</strong> <br>
+          1 GPU: 32 GB — impossible once weights are loaded<br>
         4 GPUs: 8 GB each — fits comfortably<br>
         8 GPUs: 4 GB each — room for larger batches</p>
       </div>
@@ -281,9 +282,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
         \[\text{Out}_1=\text{softmax}\!\bigl(Q_1[K_1^\top,K_2^\top,\ldots]\bigr)[V_1,V_2,\ldots]\]
       </div>
       <div class="card" style="margin-top:8px;border-color:var(--hl);">
-        <h3 style="color:var(--hl);">The Solution</h3>
-        <p>Attention between a query block and any set of KV blocks can be computed in any order — as long as softmax statistics (running max, sum of exp, weighted output) are correctly merged and rescaled after each block.</p>
-        <!-- <p>Rotate KV blocks around a GPU ring. Accumulate partial softmax statistics using an online algorithm that can merge blocks exactly, in any order.</p> -->
+        <p><strong>The Solution</strong>: Attention between a query block and any set of KV blocks can be computed in any order — as long as softmax statistics (running max, sum of exp, weighted output) are correctly merged and rescaled after each block.</p>
       </div>
     </div>
   </div>
@@ -326,11 +325,11 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
 
 <!-- ====== SLIDE 9: ONLINE SOFTMAX ====== -->
 <section>
-  <h2>Online Softmax: Why the Math is Exact</h2>
+  <h2>Ring Attention: Online Softmax</h2>
   <div class="g2" style="align-items:start;">
     <div>
       <div class="card">
-        <h3>Why It Works</h3>
+        <h3>Why the Math is Exact</h3>
         <p>Softmax scores depend on the global maximum logit \(m^*\). When a new KV block arrives with a higher max \(m^{'}\), we rescale all prior partial sums by \(\exp(m_{\text{old}} - m_{\text{new}})\). This corrects the shifted denominator exactly — no approximation.</p>
       </div>
       <div class="card" style="margin-top: 16px; font-size: 0.85em; color: var(--body);">
@@ -367,42 +366,39 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
 
 <!-- ====== SLIDE 10: OVERLAP + MEMORY ====== -->
 <section>
-  <h2>Communication Hidden by Computation</h2>
+  <h2>Ring Attention: Communication Overlap and Memory</h2>
   <div class="g2" style="align-items:start;">
     <div>
-      <div class="card">
-        <h3>Memory Per GPU: Always 6 Blocks</h3>
-        <p>Each GPU stores exactly:<br>
-        1 query block (stationary) + 2 current K,V blocks + 2 incoming K,V blocks (buffered) + 1 output accumulator</p>
-        <div style="margin-top:7px;background:var(--math);border-radius:5px;padding:6px 10px;border:1px solid var(--border);">
-          <span style="color:var(--hl);font-size:0.86em;font-weight:600;">Total = 6bch bytes</span>
-          <div style="font-size:0.72em;color:var(--dim);margin-top:2px;">Independent of total sequence length</div>
-        </div>
+      <div class="card" style="margin-top:9px;margin-bottom:15px;">
+        <p><strong>Communication Overlap:</strong> While GPU i computes on the current KV block, it simultaneously sends that block to GPU i+1 and receives the next from GPU i−1. If compute time ≥ transfer time, there is zero communication overhead.</p>
       </div>
-    </div>
-    <div>
       <div class="math-box" style="font-size:0.83em;">
         <div style="font-size:0.69em;color:var(--dim);margin-bottom:5px;">Block size c, hidden dim d, FLOP/s F, bandwidth B:</div>
         <table style="width:100%;font-size:0.85em;border-collapse:collapse;">
           <tr><td style="color:var(--hl);padding:3px 7px;">Compute time</td><td style="padding:3px 7px;">\(\dfrac{4dc^2}{F}\)</td></tr>
           <tr><td style="color:#7c3aed;padding:3px 7px;">Transfer time</td><td style="padding:3px 7px;">\(\dfrac{4cd}{B}\)</td></tr>
         </table>
-        <div style="border-top:1px solid var(--border);margin:7px 0;"></div>
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
           <div style="color:#b45309;font-weight:600;">Overlap when: \(c \;\geq\; \dfrac{F}{B}\)</div>
           <div style="font-size:0.62em;color:var(--dim);">Compute scales as c², communication as c — easy to satisfy in practice.</div>
         </div>
       </div>
     </div>
-  </div>
-  <div class="card" style="margin-top:9px;">
-    <h3>Why Communication Can Be Hidden</h3>
-    <p>While GPU i computes on the current KV block, it simultaneously sends that block to GPU i+1 and receives the next from GPU i−1. If compute time ≥ transfer time, there is zero communication overhead.</p>
-  </div>
-  <div class="card" style="border-color:var(--hl);margin-top:9px;">
-    <h3 style="color:var(--hl);">Scaling Law</h3>
-    <p style="font-size:0.62em;">If a model supports context s on 1 GPU, Ring Attention supports N·s on N GPUs with identical flop utilization. Demonstrated beyond 100M tokens without approximation.</p>
-  </div>
+    <div>
+      <div class="card" style="margin-top:9px;margin-bottom:15px;">
+        <p><strong>Memory Requirements:</strong> Each host (GPU) needs to hold 6 blocks:</p>
+        <p>1 query block (stationary) + 2 current K,V blocks + 2 incoming K,V blocks (buffered) + 1 output accumulator</p>
+        <p><strong>Total = 6bch bytes</strong></p>
+        <div style="font-size:0.48em;color:var(--dim);margin-top:7px;">Independent of sequence size; b: batch size, c: block size, d: hidden dimension</div>
+      </div>
+      <div>
+        <div class="card" style="border-color:var(--hl);margin-top:9px;">
+            <h3 style="color:var(--hl);">Scaling Law</h3>
+            <p style="font-size:0.62em;">If a model supports context s on 1 GPU, Ring Attention supports N·s on N GPUs with identical flop utilization. Demonstrated beyond 100M tokens without approximation.</p>
+        </div>
+    </div>
+</div>
+
   <span class="cite">Liu et al., Ring Attention, ICLR 2024</span>
 </section>
 
