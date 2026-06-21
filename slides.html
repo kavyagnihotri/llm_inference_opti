@@ -282,7 +282,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
       </div>
       <div class="card" style="margin-top:8px;border-color:var(--hl);">
         <h3 style="color:var(--hl);">The Solution</h3>
-        <p>Attention between a query block and any set of KV blocks can be computed in any order — as long as softmax statistics (running max, sum of exp, weighted output) are correctly merged after each block.</p>
+        <p>Attention between a query block and any set of KV blocks can be computed in any order — as long as softmax statistics (running max, sum of exp, weighted output) are correctly merged and rescaled after each block.</p>
         <!-- <p>Rotate KV blocks around a GPU ring. Accumulate partial softmax statistics using an online algorithm that can merge blocks exactly, in any order.</p> -->
       </div>
     </div>
@@ -293,8 +293,8 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
 <section>
   <h2>Ring Attention <span class="tag loss">Lossless</span></h2>
   <div class="card" style="margin-top:9px;margin-bottom:15px;border-color:var(--hl);">
-        <h3 style="color:var(--hl);">Main Idea</h3>
-        <p>Rotate KV blocks around a GPU ring. Accumulate partial softmax statistics using an online algorithm that can merge blocks exactly and in any order.</p>
+        <!-- <h3 style="color:var(--hl);">Main Idea</h3> -->
+        <p><strong>Idea:</strong> KV blocks around a GPU ring. Accumulate partial softmax statistics using an online algorithm that can merge blocks exactly and in any order.</p>
       </div>
   <div class="g2" style="align-items:start;">
     <div>
@@ -318,6 +318,9 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
       <p class="hint">Q blocks (blue) stay fixed · KV blocks (red) rotate clockwise</p>
     </div>
   </div>
+  <div class="card" style="margin-top:8px;">
+        <p><strong>The Sequential Constraint:</strong> GPU can finalize its output until all N−1 KV blocks have rotated through. Round k feeds into round k+1. This is the fundamental latency cost of Ring Attention.</p>
+      </div>
   <span class="cite">Liu et al., Ring Attention with Blockwise Transformers for Near-Infinite Context, ICLR 2024</span>
 </section>
 
@@ -328,27 +331,36 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
     <div>
       <div class="card">
         <h3>Why It Works</h3>
-        <p>Softmax scores depend on the global maximum logit m*. When a new KV block arrives with a higher max m', we rescale all prior partial sums by exp(m_old − m_new). This corrects the shifted denominator exactly — no approximation.</p>
+        <p>Softmax scores depend on the global maximum logit \(m^*\). When a new KV block arrives with a higher max \(m^{'}\), we rescale all prior partial sums by \(\exp(m_{\text{old}} - m_{\text{new}})\). This corrects the shifted denominator exactly — no approximation.</p>
       </div>
-      <div class="card" style="margin-top:8px;">
-        <h3>The Sequential Constraint</h3>
-        <p>No GPU can finalize its output until all N−1 KV blocks have rotated through. Round k feeds into round k+1. This is the fundamental latency cost of Ring Attention.</p>
+      <div class="card" style="margin-top: 16px; font-size: 0.85em; color: var(--body);">
+        <p><strong>Variables</strong></p>
+        <ul style="margin-bottom: 16px; padding-left: 20px; line-height: 1.5;">
+          <li style="margin-bottom: 6px;"><strong>\(m\)</strong>: local maximum logit found so far in this block (\(\max(x_i)\))</li>
+          <li style="margin-bottom: 6px;"><strong>\(x_i\)</strong>: raw attention score (logit) for a single token i.e. \(Q \cdot K^T\)</li>
+          <li style="margin-bottom: 6px;"><strong>\(s\)</strong>: local sum of exponentials</li>
+          <li style="margin-bottom: 6px;"><strong>\(v_i\)</strong>: value vector corresponding to the token</li>
+          <li style="margin-bottom: 6px;"><strong>\(a_i\)</strong>: local softmax probability for token \(i\)</li>
+          <li style="margin-bottom: 6px;"><strong>\(o\)</strong>: local attention output</li>
+          <li style="margin-bottom: 6px;"><strong>\(s_{\text{new}}\)</strong>: updated global denominator</li>
+          <li style="margin-bottom: 6px;"><strong>\(o_{\text{new}}\)</strong>: updated global attention output</li>
+        </ul>
       </div>
     </div>
     <div>
       <p style="font-size:0.53em;color:var(--body);margin-bottom:8px;">Standard softmax cannot be split. Online softmax maintains running statistics that can be merged in any order with zero error.</p>
       <div class="math-box" style="font-size:0.79em;">
-        <div style="font-size:0.68em;color:var(--dim);margin-bottom:5px;">Each device tracks:</div>
+        <div style="font-size:0.68em;color:var(--dim);">Each device tracks:</div>
         \[m \leftarrow \max(\text{logits}),\quad s \leftarrow \textstyle\sum e^{x_i-m},\quad o \leftarrow \textstyle\sum a_i v_i\]
-        <div style="font-size:0.68em;color:var(--dim);margin:7px 0 4px;">When new KV block arrives with max \(m'\):</div>
-        \[s_{\text{new}} = e^{m-m'}\,s + s'\]
+        <div style="font-size:0.68em;color:var(--dim);margin:7px 0 4px;">When new KV block arrives with its own statistics (\(m'\), \(s'\), \(o'\)):</div>
+        \[s_{\text{new}} = e^{m-m'} \cdot \,s + s'\]
         \[o_{\text{new}} = \frac{e^{m-m'}\cdot s\cdot o\;+\;s'\cdot o'}{s_{\text{new}}}\]
       </div>
     </div>
   </div>
   <div class="card" style="border-color:#b45309;margin-top:9px;">
-    <h3 style="color:#b45309;">Result</h3>
-    <p style="font-size:0.62em;">Output is bit-for-bit identical to full single-device attention. Zero approximation. The only cost is KV block communication overhead between GPUs.</p>
+    <!-- <h3 style="color:#b45309;">Result</h3> -->
+    <p style="font-size:0.62em;"> <strong style="color:#b45309;">Result:</strong> Output is bit-for-bit identical to full single-device attention. The only cost is KV block communication overhead between GPUs.</p>
   </div>
   <span class="cite">Liu et al., Ring Attention, ICLR 2024</span>
 </section>
