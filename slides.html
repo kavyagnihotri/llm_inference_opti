@@ -728,22 +728,23 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <div class="g2">
     <div>
       <div class="card">
-        <h3>Pipeline Parallelism (PP)</h3>
+        <h3>1. Pipeline Parallelism (PP)</h3>
         <p>Layer groups split across servers over slow inter-server links. Server 1: layers 1–25, Server 2: 26–50, etc. Naive PP: Server 1 processes the full 100K prompt while Servers 2–4 sit completely idle. This is the pipeline bubble.</p>
       </div>
-      <div class="card" style="margin-top:8px;border-color:var(--hl);">
-        <h3 style="color:var(--hl);">Chunked PP: The Fix</h3>
-        <p>Slice the prompt into 4K-token chunks. Server 1 processes chunk 1 through layers 1–25, passes it to Server 2, immediately picks up chunk 2. By the time chunk 1 reaches Server 4, all four servers work simultaneously on different chunks.</p>
+      <div class="card" style="margin-top:8px">
+        <h3>2. Context Parallelism (CP) Within a Server</h3>
+        <p>Using the ultra-fast NVLink cables inside Server 1, CP splits the prompt itself: GPU A takes tokens 1–25,000, GPU B takes 25,001–50,000, and they compute Layer 1 at the exact same time by passing data in a continuous circle.</p>
       </div>
     </div>
     <div>
       <div class="card">
-        <h3>Context Parallelism Within a Server</h3>
-        <p>Inside each server, GPUs use NVLink (~900 GB/s) to run Ring/Striped Attention on each chunk in parallel. NVLink makes per-step KV rotation cheap. Cross-server PP uses slower InfiniBand but avoids KV rotation entirely.</p>
+        <h3 style="color:var(--hl);">3. Chunked PP: The Fix</h3>
+        <p>Slice the prompt into 4K-token chunks. Server 1 processes chunk 1 through layers 1–25, passes it to Server 2, immediately picks up chunk 2. By the time chunk 1 reaches Server 4, all four servers work simultaneously on different chunks.</p>
       </div>
+
       <div class="card" style="margin-top:8px;border-color:#b45309;">
-        <h3 style="color:#b45309;">Hybrid CP × PP</h3>
-        <p>Within each server: CP (NVLink) for sequence splitting. Across servers: Chunked PP for model depth. Software topology matches hardware topology. GPUs never idle, never OOM.</p>
+        <h3 style="color:#b45309;">4. Hybrid CP × PP</h3>
+        <p>n GPUs inside Server 1 use Context Parallelism to simultaneously compute the first 4,000-token chunk across Layers 1–25, and then use Chunked Pipeline Parallelism to pass that finished chunk to Server 2 over the slower network, instantly grabbing the next chunk. This hybrid strategy perfectly matches the software to the hardware, ensuring the GPUs never OOMs or idle.</p>
       </div>
     </div>
   </div>
