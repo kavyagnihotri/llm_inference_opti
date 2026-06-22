@@ -595,7 +595,8 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
         <p>As tokens travel through layers, their hidden states: each token's internal vector representation stop changing significantly. By the midpoint of the model, each token's representation is already close to its final-layer state.</p>
       </div>
       <div class="math-box" style="margin-top:9px;font-size:0.83em;">
-        <div style="font-size:0.69em;color:var(--dim);margin-bottom:5px;">Standard prefill — all L layers run for every token:</div>
+        <div style="font-size:0.69em;color:var(--dim);margin-bottom:5px;">Standard prefill (when the initial prompt is processed)<br>
+        - all L layers run for every token:</div>
         \[h^{(1)} \to h^{(2)} \to \cdots \to h^{(L)}\]
         <div style="font-size:0.69em;color:var(--dim);margin:7px 0 4px;">SwiftKV — project KV for later layers from pivot layer output \(h^{(l)}\):</div>
         \[h^{(l)} \;\xrightarrow{\text{project}}\; \text{KV}^{(l+1)},\ldots,\text{KV}^{(L)}\]
@@ -604,11 +605,11 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
     <div>
       <div class="card">
         <h3>What Gets Skipped During Prefill</h3>
-        <p>For prompt tokens in layers l+1 to L: attention, MLP, Q projection, and output projection are all skipped. Only the K and V projections run, using h<sup>(l)</sup> as input. Decoding runs all layers unchanged.</p>
+        <p>For prompt tokens in layers l+1 to L: attention, MLP, Q projection, and output projection are all skipped. Only the K and V projections run, using h<sup>(l)</sup> as input. <br>* Decoding runs all layers unchanged to ensure high reasoning quality.</p>
       </div>
       <div class="card" style="margin-top:8px;">
         <h3>AcrossKV: Optional Memory Savings</h3>
-        <p>Instead of a separate KV per skipped layer, AcrossKV shares one KV cache across several consecutive skipped layers — compresses memory footprint at the cost of slightly more approximation.</p>
+        <p>While SwiftKV primarily saves compute time, its AcrossKV feature also significantly reduces memory usage. Normally, <strong>skipped layers</strong> still require their own stored KV cache. AcrossKV solves this by calculating <strong>a single KV cache and sharing it across consecutive layers</strong>. This shrinks the overall memory footprint, making it highly effective for long-context tasks where memory is the primary bottleneck.</p>
       </div>
     </div>
   </div>
@@ -622,7 +623,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
     <div>
       <div class="card">
         <h3>Knowledge Distillation</h3>
-        <p>The architectural change initially drops accuracy. Recovery: freeze the original model as "teacher," fine-tune only the KV projection weights of skipped layers — less than 10% of total parameters. Train on fewer than 1B tokens. Completes in hours, not weeks.</p>
+        <p>The architectural change initially drops accuracy. <br><strong>Recovery:</strong> freeze the original model as "teacher," fine-tune only the KV projection weights of skipped layers (less than 10% of total parameters) to match the teacher's output logits. <br>* Completes in hours, not weeks since trained on fewer than 1B tokens.</p>
       </div>
       <div class="card" style="margin-top:8px;border-color:var(--hl);">
         <h3 style="color:var(--hl);">Zero Infrastructure Changes</h3>
@@ -646,7 +647,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   </div>
   <div class="card" style="margin-top:9px;border-color:var(--hl);">
     <h3 style="color:var(--hl);">Best Fit</h3>
-    <p>RAG and summarization: long prompts, short outputs. Prefill dominates total time</p>
+    <p>RAG and summarization: long prompts, short outputs. Prefill dominates total time.</p>
   </div>
   <p style="font-size:0.4em;color:var(--dim);margin-top:9px;text-align:center;">Open source: Arctic Inference plugin for vLLM from Snowflake · Production-deployed in Arctic model serving</p>
   <span class="cite">Qiao et al., SwiftKV, 2024 | Arctic Inference plugin for vLLM</span>
@@ -662,11 +663,11 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <div class="card" style="border-color:#b45309;margin-bottom:9px;">
     <h3 style="color:#b45309;">Two Failed Fixes</h3>
     <p><b>Window Attention:</b> Keep only the most recent N KV states — constant memory. But once the sequence exceeds cache size, perplexity explodes. Position embeddings no longer match training; the model collapses.</p>
-    <p style="margin-top:7px;"><b>Sliding Window + Recomputation:</b> Rebuilds KV states for recent tokens at each step. Strong quality, but the quadratic recomputation cost makes it 22× slower than needed — impractical for real streaming.</p>
+    <p style="margin-top:7px;"><b>Sliding Window + Recomputation:</b> Rebuilds KV states for recent tokens at each step. Strong quality, but the quadratic recomputation cost makes it 22× slower than needed so impractical for real streaming.</p>
   </div>
   <div class="card" style="border-color:var(--hl);">
     <h3 style="color:var(--hl);">The Root Cause: Attention Sinks</h3>
-    <p>Both approaches miss a deeper problem. Softmax requires attention scores to sum to 1. When no token is a strong match, the model "dumps" spare attention onto the initial tokens as a "sink" — even if those tokens carry no semantic relevance. Evicting these sinks removes the dump site and destabilizes softmax.</p>
+    <p>Both approaches miss a deeper problem. Softmax requires attention scores to sum to 1. When no token is a strong match, the model "dumps" spare attention onto the initial tokens as a "sink", even if those tokens carry no semantic relevance. <br>Evicting these sinks removes the dump site and destabilizes softmax.</p>
   </div>
   <span class="cite">Xiao et al., Efficient Streaming Language Models with Attention Sinks, ICLR 2024</span>
 </section>
@@ -676,29 +677,38 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <h2>StreamingLLM: Attention Sinks and the Fix</h2>
   <div class="card" style="border-color:var(--hl);margin-bottom:9px;">
     <h3 style="color:var(--hl);">The Attention Sink Phenomenon</h3>
-    <p>Transformers assign disproportionately high attention weight to the first few tokens in every sequence, regardless of their content. This is not a curiosity — it is load-bearing. Softmax must distribute probability mass somewhere; initial tokens become the default dump site.</p>
+    <p>Transformers assign disproportionately high attention weight to the first few tokens in every sequence, regardless of their content. This is not a curiosity, it is load-bearing. Softmax must distribute probability mass somewhere; initial tokens become the default dump site.</p>
   </div>
   <div style="padding:10px 14px;background:#fff8f0;border:1px solid #f59e0b;border-radius:7px;font-size:0.53em;color:var(--body);margin-bottom:9px;">
-    <b>Key experiment:</b> Replace the first 4 tokens with "\n" (newline). The model still concentrates attention on them. It is the <em>absolute position</em> that matters — not the content. This rules out semantic explanations and confirms the sink is positional.
+    <b>Key experiment:</b> Replace the first 4 tokens with "\n" (newline). The model still concentrates attention on them. It is the <em>absolute position</em> that matters, and not the content. This rules out semantic explanations and confirms the sink is positional.
   </div>
   <div class="card" style="margin-bottom:9px;">
     <h3>Why This Matters</h3>
-    <p>Any window attention scheme that evicts the initial tokens removes the sink. Without a place to dump spare attention, softmax becomes unstable and model quality collapses — explaining the window-attention failure exactly.</p>
+    <p>Any window attention scheme that evicts the initial tokens removes the sink. Without a place to dump spare attention, softmax becomes unstable and model quality collapses; explaining the window-attention failure exactly.</p>
   </div>
   <div class="card" style="border-color:var(--hl);">
     <h3 style="color:var(--hl);">The Fix: Keep the Sinks</h3>
-    <p>Permanently retain the first 4 tokens (attention sinks) in the KV cache alongside a rolling window of the most recent tokens. When new tokens arrive, evict only from the rolling window — never the sinks. Memory stays constant; softmax stays stable.</p>
+    <p>Permanently retain the first 4 tokens (attention sinks) in the KV cache alongside a rolling window of the most recent tokens. When new tokens arrive, evict only from the rolling window and never the sinks. Memory stays constant; softmax stays stable.</p>
   </div>
   <span class="cite">Xiao et al., Efficient Streaming Language Models with Attention Sinks, ICLR 2024</span>
 </section>
 
 <!-- ====== SLIDE 18c: STREAMING LLM — RESULTS ====== -->
 <section>
-  <h2>StreamingLLM: Results and Position Re-Indexing</h2>
+  <h2>StreamingLLM: Solutions, Position Re-Indexing and Results</h2>
   <div class="g2" style="align-items:start;margin-bottom:9px;">
-    <div class="card">
-      <h3>Position Re-Indexing</h3>
-      <p>Assign position indices relative to <em>cache slots</em>, not original sequence positions. The model permanently believes it is reading a short document within its training window — it never hits the training-length limit, enabling truly infinite generation.</p>
+    <div>
+      <div class="card">
+        <h3>Two Solutions</h3>
+        <ul>
+          <li><strong>Zero Sink (SoftMax-off-by-One):</strong> Alters softmax so scores don't strictly sum to one (<i>e<sup>x<sub>i</sub></sup> / (1 + &sum; e<sup>x<sub>j</sub></sup>)</i>). This provides partial relief, the model still relies on other initial tokens as attention sinks.  --<em>OR</em>--</li>
+          <li><strong>Sink Token:</strong> A dedicated, trainable token that absorbs excess attention. This is the <em>most effective</em> approach, stabilizing attention and improving overall model perplexity.</li>
+        </ul>
+      </div>
+      <div class="card" style="margin-top:9px;">
+        <h3>Position Re-Indexing</h3>
+        <p>Assign position indices relative to <em>cache slots</em>, not original sequence positions. The model permanently believes it is reading a short document within its training window — it never hits the training-length limit, enabling truly infinite generation.</p>
+      </div>
     </div>
     <div>
       <img src="plots/fig4_attention_sinks.png" style="width:100%;object-fit:contain;border-radius:8px;border:1px solid var(--border);display:block;" alt="StreamingLLM KV cache">
@@ -706,8 +716,8 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
     </div>
   </div>
   <div class="card" style="border-color:#b45309;">
-    <h3 style="color:#b45309;">Why It Works · Results</h3>
-    <p>Sinks serve as a mathematical dump for spare attention — the model ignores the artificial positional distance between sinks and recent tokens, as long as recent tokens maintain correct relative spacing. This enables contexts of <b class="good">4M+ tokens</b> with a fixed KV cache, a <b class="good">22.2× speedup</b> over sliding window recomputation, with no fine-tuning required across Llama-2, MPT, Falcon, and Pythia.</p>
+    <h3 style="color:#b45309;">Results</h3>
+    <p>Sinks serve as a mathematical dump for spare attention. The model ignores the artificial positional distance between sinks and recent tokens, as long as recent tokens maintain correct relative spacing. This enables contexts of <b class="good">4M+ tokens</b> with a fixed KV cache, a <b class="good">22.2× speedup</b> over sliding window recomputation, with no fine-tuning required across Llama-2, MPT, Falcon, and Pythia.</p>
   </div>
   <span class="cite">Xiao et al., Efficient Streaming Language Models with Attention Sinks, ICLR 2024</span>
 </section>
