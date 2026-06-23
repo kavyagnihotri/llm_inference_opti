@@ -539,7 +539,7 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <h2>NSA: Architecture at a Glance</h2>
   <div class="card" style="margin-bottom:10px;">
     <h3>Output Merge via Learned Gating</h3>
-    <p style="font-size:0.6em;">Three branch outputs combined by a learned gate. All heads select identical blocks is not just algorithmic: it is a hardware prerequisite that keeps KV reads contiguous and eliminates redundant memory transfers in the custom kernel.</p>
+    <p style="font-size:0.6em;">Three branch outputs combined by a learned gate. All heads selecting identical blocks is not just algorithmic: it is a hardware prerequisite that keeps KV reads contiguous and eliminates redundant memory transfers in the custom kernel.</p>
   </div>
   <img src="plots/fig2_deepseek_nsa.png" style="width:100%;max-height:400px;object-fit:contain;border-radius:8px;border:1px solid var(--border);display:block;margin:0 auto;" alt="NSA architecture">
   <p class="figcap" style="margin-top:8px;font-size:0.54em;">Figure 2, Yuan et al. 2025. Three parallel branches: compressed (coarse global), selected (important exact blocks), sliding window (local). Green tiles = computed; white tiles = skipped. All three outputs are merged by a learned gate.</p>
@@ -569,8 +569,8 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
       <table class="dt">
         <thead><tr><th>Metric (64K context)</th><th>NSA vs Full Attn</th></tr></thead>
         <tbody>
-          <tr><td>Training throughput</td><td class="good">9× faster</td></tr>
-          <tr><td>Decoding speed</td><td class="good">11.6× faster</td></tr>
+          <tr><td>Training throughput</td><td class="good">2-4× faster</td></tr>
+          <tr><td>Decoding speed at 64K</td><td class="good">11.6× faster</td></tr>
           <tr><td>General benchmarks</td><td class="good">matches or exceeds</td></tr>
           <tr><td>Long-context retrieval</td><td class="good">perfect accuracy</td></tr>
           <tr><td>Chain-of-thought math</td><td class="good">exceeds Full Attn</td></tr>
