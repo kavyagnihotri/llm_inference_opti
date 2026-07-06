@@ -761,6 +761,29 @@ button.btn.ghost{background:var(--math);border:1px solid var(--border);color:var
   <span class="cite">LMSYS Blog: Chunked Pipeline Parallelism, January 2026</span>
 </section>
 
+<!-- ====== SLIDE 21b: CPP ANIMATION ====== -->
+<section>
+  <h2>Watch the Bubble Disappear: PP vs CP vs Both</h2>
+  <p style="font-size:0.5em;color:var(--body);margin-bottom:6px;">Same 4-server, 100-layer setup as before. Toggle each strategy independently and step through time to see server utilization change.</p>
+  <div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:4px;">
+    <span style="font-size:0.44em;color:var(--dim);">Chunked PP:</span>
+    <span class="chip" id="chipChunk" style="cursor:pointer;" onclick="toggleChunk()">OFF</span>
+    <span style="font-size:0.44em;color:var(--dim);margin-left:14px;">Context Parallelism:</span>
+    <span class="chip" id="chipCP" style="cursor:pointer;" onclick="toggleCP()">OFF</span>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;">
+    <svg id="cppViz" width="660" height="250" style="display:block;background:var(--math);border-radius:10px;border:1px solid var(--border);"></svg>
+    <div style="text-align:center;margin-top:7px;">
+      <button class="btn" onclick="cppStep()">Step &rarr;</button>
+      <button class="btn ghost" onclick="cppPlay()">&#9654; Play</button>
+      <button class="btn ghost" onclick="cppReset()">Reset</button>
+      <span id="cppLbl" style="font-size:0.44em;color:var(--dim);margin-left:8px;"></span>
+    </div>
+  </div>
+  <div class="card" style="margin-top:8px;" id="cppExplain"></div>
+  <p class="hint">Click the toggles, then Step or Play through time. Colored = server busy on a chunk, grey = idle. Ring icon = GPUs inside that server splitting work via context parallelism.</p>
+</section>
+
 <!-- ====== SLIDE 22: VLLM VS SGLANG ====== -->
 <section>
   <h2>vLLM vs SGLang: The Current Tension</h2>
@@ -956,15 +979,151 @@ function ringReset() {
   drawRing();
 }
 
+/* -------- Chunked PP / CP animation -------- */
+let cppChunked = false;
+let cppCP = false;
+let cppT = -1;
+let cppTimer = null;
+const cppServerLabels = ['S1 · L1–25','S2 · L26–50','S3 · L51–75','S4 · L76–100'];
+const cppChunkColors = ['#1565c0','#7c3aed','#059669','#b45309','#c62828','#0891b2'];
+
+function cppSchedule() {
+  const numServers = 4;
+  const numChunks = cppChunked ? 6 : 1;
+  const maxT = (numChunks - 1) + (numServers - 1);
+  const cells = [];
+  for (let s = 0; s < numServers; s++) {
+    cells[s] = [];
+    for (let t = 0; t <= maxT; t++) {
+      const c = t - s;
+      cells[s][t] = (c >= 0 && c < numChunks) ? c : null;
+    }
+  }
+  return { numServers, numChunks, maxT, cells };
+}
+
+function drawCPP() {
+  const svg = d3.select('#cppViz');
+  if (svg.empty()) return;
+  svg.selectAll('*').remove();
+  const sch = cppSchedule();
+  const marginLeft = 96, marginTop = 26;
+  const cw = 58, ch = 42, gap = 6;
+  const W = marginLeft + (sch.maxT + 1) * (cw + gap) + 20;
+  const H = marginTop + sch.numServers * (ch + gap) + 20;
+  svg.attr('width', Math.max(660, W)).attr('height', Math.max(250, H));
+
+  for (let t = 0; t <= sch.maxT; t++) {
+    svg.append('text')
+      .attr('x', marginLeft + t * (cw + gap) + cw / 2).attr('y', marginTop - 10)
+      .attr('text-anchor', 'middle').attr('font-size', '9px')
+      .attr('fill', t === cppT ? '#c62828' : '#aaa')
+      .attr('font-weight', t === cppT ? 'bold' : 'normal')
+      .text('t' + t);
+  }
+
+  sch.cells.forEach((row, s) => {
+    svg.append('text')
+      .attr('x', marginLeft - 10).attr('y', marginTop + s * (ch + gap) + ch / 2 + 4)
+      .attr('text-anchor', 'end').attr('font-size', '10px').attr('fill', '#4a3f38').attr('font-weight', '600')
+      .text(cppServerLabels[s]);
+
+    row.forEach((c, t) => {
+      const x = marginLeft + t * (cw + gap);
+      const y = marginTop + s * (ch + gap);
+      const revealed = t <= cppT;
+      const g = svg.append('g');
+      const rect = g.append('rect')
+        .attr('x', x).attr('y', y).attr('width', cw).attr('height', ch).attr('rx', 6)
+        .attr('stroke', t === cppT ? '#c62828' : '#ddd')
+        .attr('stroke-width', t === cppT ? 2 : 1);
+      if (!revealed) {
+        rect.attr('fill', '#fff').attr('stroke-dasharray', '3,3');
+      } else if (c === null) {
+        rect.attr('fill', '#ececeb');
+        g.append('text').attr('x', x + cw / 2).attr('y', y + ch / 2 + 3).attr('text-anchor', 'middle')
+          .attr('font-size', '9px').attr('fill', '#999').text('idle');
+      } else {
+        rect.attr('fill', cppChunkColors[c % cppChunkColors.length]).attr('opacity', 0.88);
+        g.append('text').attr('x', x + cw / 2).attr('y', y + ch / 2 + 3).attr('text-anchor', 'middle')
+          .attr('font-size', '9.5px').attr('font-weight', '700').attr('fill', '#fff')
+          .text(sch.numChunks === 1 ? 'FULL' : 'C' + (c + 1));
+        if (cppCP) {
+          const rcx = x + cw - 13, rcy = y + 11, rr = 6;
+          [-Math.PI / 2, 0, Math.PI / 2, Math.PI].forEach(a => {
+            g.append('circle').attr('cx', rcx + rr * Math.cos(a)).attr('cy', rcy + rr * Math.sin(a))
+              .attr('r', 1.6).attr('fill', '#fff');
+          });
+          g.append('circle').attr('cx', rcx).attr('cy', rcy).attr('r', rr + 3)
+            .attr('fill', 'none').attr('stroke', '#fff').attr('stroke-width', 0.8).attr('stroke-dasharray', '1.5,1.5');
+        }
+      }
+    });
+  });
+
+  const busyNow = cppT >= 0 ? sch.cells.filter(row => row[cppT] !== null).length : 0;
+  const lbl = document.getElementById('cppLbl');
+  if (lbl) lbl.textContent = cppT < 0
+    ? ('Ready — ' + (sch.maxT + 1) + ' steps total')
+    : ('t=' + cppT + ' of ' + sch.maxT + ' · ' + busyNow + '/' + sch.numServers + ' servers active');
+
+  const explain = document.getElementById('cppExplain');
+  if (explain) {
+    let msg;
+    if (!cppChunked && !cppCP) msg = '<strong>Naive PP:</strong> the whole prompt moves through one server at a time. Only 1 of 4 servers is ever busy, the other three sit idle. This is the pipeline bubble.';
+    else if (!cppChunked && cppCP) msg = '<strong>CP alone:</strong> whichever server is active now finishes faster (its GPUs split the prompt over NVLink), but the bubble across servers is untouched, still only 1 of 4 busy at a time.';
+    else if (cppChunked && !cppCP) msg = '<strong>Chunked PP:</strong> slicing the prompt into chunks lets consecutive servers pick up work as soon as the previous one hands off a chunk. Utilization ramps up to 4/4 and stays there.';
+    else msg = '<strong>Hybrid CP × PP:</strong> chunks flow through all 4 servers with no bubble, and each server\'s chunk is itself computed fast across its local GPUs via context parallelism. This is what production systems deploy.';
+    explain.innerHTML = '<p>' + msg + '</p>';
+  }
+}
+
+function cppStep() {
+  const sch = cppSchedule();
+  if (cppT < sch.maxT) cppT++;
+  drawCPP();
+}
+function cppReset() {
+  cppT = -1;
+  if (cppTimer) { clearInterval(cppTimer); cppTimer = null; }
+  drawCPP();
+}
+function cppPlay() {
+  const sch = cppSchedule();
+  if (cppTimer) { clearInterval(cppTimer); cppTimer = null; return; }
+  cppTimer = setInterval(() => {
+    const s = cppSchedule();
+    if (cppT >= s.maxT) { clearInterval(cppTimer); cppTimer = null; return; }
+    cppT++;
+    drawCPP();
+  }, 550);
+}
+function toggleChunk() {
+  cppChunked = !cppChunked;
+  const el = document.getElementById('chipChunk');
+  el.textContent = cppChunked ? 'ON' : 'OFF';
+  el.classList.toggle('on', cppChunked);
+  cppReset();
+}
+function toggleCP() {
+  cppCP = !cppCP;
+  const el = document.getElementById('chipCP');
+  el.textContent = cppCP ? 'ON' : 'OFF';
+  el.classList.toggle('on', cppCP);
+  drawCPP();
+}
+
 Reveal.on('slidechanged', e => {
   const s = e.currentSlide;
   if (s.querySelector('#flopChart')) setTimeout(initFlopChart, 60);
   if (s.querySelector('#ringViz'))   drawRing();
+  if (s.querySelector('#cppViz'))    drawCPP();
 });
 Reveal.on('ready', e => {
   const s = e.currentSlide;
   if (s.querySelector('#flopChart')) initFlopChart();
   if (s.querySelector('#ringViz'))   drawRing();
+  if (s.querySelector('#cppViz'))    drawCPP();
 });
 </script>
 </body>
